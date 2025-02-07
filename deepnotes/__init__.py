@@ -1,3 +1,3 @@
-from main import DeepNotesEngine
+from .main import DeepNotesEngine
 
 __all__ = ["DeepNotesEngine"]

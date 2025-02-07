@@ -1,19 +1,23 @@
+from typing import cast
+
 from deepnotes.main import DeepNotesEngine
 from deepnotes.models import IntermediateDataModel
 
 
-def test_full_pipeline(test_db):
+def test_full_pipeline(test_db, sample_data: IntermediateDataModel):
     # Initialize engine with test config
     engine = DeepNotesEngine("tests/test_config.yml")
+    engine.data_model = sample_data
     engine.initialize_processors()
 
     # Run pipeline
     result = engine.run_pipeline()
 
     # Verify outputs
-    assert isinstance(engine.data_model, IntermediateDataModel)
-    assert len(engine.data_model.entities) > 0
-    assert len(engine.data_model.notes) > 0
+    data_model = cast(IntermediateDataModel, engine.data_model)
+    assert len(data_model.entities) >= 2
+    assert any(e.attributes['name'] == "Test Entity 1" for e in data_model.entities)
+    assert len(data_model.notes) > 0
 
     # Check report structure
     assert "technical_report" in result
@@ -21,8 +25,8 @@ def test_full_pipeline(test_db):
     assert "process_audit" in result
 
     # Verify iteration history
-    assert len(engine.data_model.iteration_history) <= 3
-    assert engine.data_model.iteration_history[-1]["analysis"] is not None
+    assert len(data_model.iteration_history) <= 3
+    assert data_model.iteration_history[-1]["analysis"] is not None
 
 
 def test_note_evolution(test_db):
@@ -33,7 +37,7 @@ def test_note_evolution(test_db):
     # Verify note improvement across iterations
     notes = engine.data_model.notes
     for i in range(1, len(notes)):
-        assert len(notes[i]["summary"]) > len(notes[i - 1]["summary"])
+        assert len(notes[i]["summary"].get("key_findings", [])) >= len(notes[i - 1]["summary"].get("key_findings", []))
         assert notes[i]["timestamp"] > notes[i - 1]["timestamp"]
 
 

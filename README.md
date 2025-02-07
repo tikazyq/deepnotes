@@ -128,7 +128,7 @@ We welcome contributions! Please see our:
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for full text.
+BSD 3-Clause License. See [LICENSE](LICENSE) for full text.
 
 ---
 

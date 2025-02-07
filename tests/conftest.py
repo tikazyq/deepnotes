@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from deepnotes.models import DataEntity, Relationship, IntermediateDataModel
 
 
 @pytest.fixture(scope="module")
@@ -47,7 +48,22 @@ def test_db():
     )
 
     conn.commit()
+    yield conn  # Keep connection open during tests
     conn.close()
-
-    yield
     db_path.unlink()
+
+
+@pytest.fixture
+def sample_data():
+    return IntermediateDataModel(
+        entities=[
+            DataEntity(id="ent-1", type="test", attributes={"name": "Test Entity 1"}, source="test"),
+            DataEntity(id="ent-2", type="test", attributes={"name": "Test Entity 2"}, source="test")
+        ],
+        relationships=[
+            Relationship(source="ent-1", target="ent-2", type="related")  # Proper relationship
+        ],
+        metadata=[{"source": "test"}],
+        notes=[],
+        iteration_history=[]
+    )

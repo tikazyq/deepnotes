@@ -22,18 +22,3 @@ class ReportGenerator:
         return template.render(
             model=data_model, timestamp=data_model.timestamp.isoformat()
         )
-
-    def generate_combined_output(self, data_model):
-        return {
-            "technical_report": self._generate_technical_report(data_model),
-            "executive_summary": self._generate_executive_summary(data_model),
-            "process_audit": self._generate_process_audit(data_model),
-        }
-
-    def _generate_process_audit(self, data_model):
-        template = self.env.get_template("process_audit.md.j2")
-        return template.render(
-            iterations=data_model.iteration_history,
-            note_versions=len(data_model.notes),
-            final_confidence=data_model.validation_summary.get("confidence", 0),
-        )

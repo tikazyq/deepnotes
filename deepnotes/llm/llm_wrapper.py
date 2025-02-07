@@ -51,7 +51,7 @@ class LLMWrapper:
     def generate(self, prompt: str) -> LLMResponse:
         """Generate response with cost tracking"""
         response: ChatCompletion = self.client.chat.completions.create(
-            model=self.config.model_name,
+            model=self.config.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
