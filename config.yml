@@ -1,0 +1,26 @@
+# DeepNotes 基础配置文件
+data_type: code  # 支持 code/document/database 等类型
+data_source: ./sample_data  # 数据源路径
+model: gpt-4  # 使用的模型名称
+
+processing_params:
+  code_extensions: [".py", ".js"]  # 代码文件扩展名
+  ignore_tests: true  # 是否忽略测试文件
+
+generation_params:
+  temperature: 0.7
+  max_tokens: 2000
+
+max_iterations: 5
+evaluation_metrics:
+  - coverage
+  - relevance
+  - structure_quality 
+
+# 在原有配置基础上添加数据库配置示例
+database_config_example:
+  data_type: database
+  data_source: "user:password@localhost:5432/mydb"
+  processing_params:
+    db_type: postgresql
+    pool_size: 5 

@@ -1,0 +1,15 @@
+deepnotes:
+  database_uri: "sqlite:///test.db"
+  max_iterations: 3
+  output_formats: [ "json", "markdown" ]
+  data_sources:
+    - source_type: "database"
+      query: "SELECT * FROM employees"
+      connection_params:
+        uri: "sqlite:///test.db"
+  llm:
+    provider: "groq"
+    model: "deepseek-r1-distill-llama-70b"
+    api_key: "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"
+    base_url: "https://api.groq.com/openai/v1/chat/completions"
+    temperature: 0.7 
