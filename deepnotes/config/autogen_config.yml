@@ -1,0 +1,23 @@
+agents:
+  core:
+    - name: "Orchestrator"
+      type: "orchestrator"
+      llm: "gpt-4"
+      workflow: "default"
+      
+  data:
+    - type: "database"
+      llm: "gpt-3.5"
+      config:
+        connection: "${DB_URI}"
+        
+    - type: "document"
+      llm: "local-model"
+      config:
+        chunk_size: 1024
+
+workflows:
+  default:
+    max_iterations: 5
+    convergence_threshold: 0.85
+    fallback_strategy: "rollback"

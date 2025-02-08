@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 from ..config import LLMConfig
-from ..models import DataEntity, IntermediateDataModel
+from ..models.models import DataEntity, IntermediateDataModel
 
 
 class Hypothesis(BaseModel):
@@ -28,7 +28,7 @@ class Hypothesis(BaseModel):
             "id": self.id,
             "description": self.description,
             "confidence": round(self.confidence, 2),
-            "is_valid": self.is_valid
+            "is_valid": self.is_valid,
         }
 
     def apply(self, data_model: IntermediateDataModel) -> IntermediateDataModel:
@@ -52,7 +52,7 @@ class HypothesisManager:
         return [
             Hypothesis(
                 description="Key patterns observed in the data structure",
-                supporting_evidence=notes.get("key_findings", [])[:2]
+                supporting_evidence=notes.get("key_findings", [])[:2],
             )
         ]
 
@@ -60,7 +60,7 @@ class HypothesisManager:
         self,
         hypotheses: List[Hypothesis],
         raw_data: List[Dict[str, Any]],
-        previous_notes: List[Dict[str, Any]]
+        previous_notes: List[Dict[str, Any]],
     ) -> List[Hypothesis]:
         """使用原始数据和历史笔记验证假设"""
         validated = []
@@ -73,22 +73,21 @@ class HypothesisManager:
             hypothesis.is_valid = evidence_exists
             hypothesis.validation_metrics = {
                 "data_support": 0.8 if evidence_exists else 0.2,
-                "historical_consistency": 0.7
+                "historical_consistency": 0.7,
             }
             validated.append(hypothesis)
         return validated
 
-    def calculate_confidence_scores(self, hypotheses: List[Hypothesis]) -> Dict[str, float]:
+    def calculate_confidence_scores(
+        self, hypotheses: List[Hypothesis]
+    ) -> Dict[str, float]:
         """计算并返回假设的置信度评分"""
-        return {
-            h.id: h.confidence * (1.0 if h.is_valid else 0.5)
-            for h in hypotheses
-        }
+        return {h.id: h.confidence * (1.0 if h.is_valid else 0.5) for h in hypotheses}
 
     def generate_evolution_plan(
         self,
         current_hypotheses: List[Hypothesis],
-        previous_hypotheses: List[Hypothesis]
+        previous_hypotheses: List[Hypothesis],
     ) -> Dict[str, Any]:
         """生成假设进化建议"""
         previous_ids = {h.id for h in previous_hypotheses}
@@ -98,13 +97,11 @@ class HypothesisManager:
             "new_hypotheses": [h.summary() for h in new_hypotheses],
             "recommended_actions": [
                 "Validate new hypotheses with additional data sources",
-                "Refine existing hypotheses based on confidence scores"
+                "Refine existing hypotheses based on confidence scores",
             ],
             "priority_order": sorted(
-                current_hypotheses,
-                key=lambda x: x.confidence,
-                reverse=True
-            )[:3]
+                current_hypotheses, key=lambda x: x.confidence, reverse=True
+            )[:3],
         }
 
 
@@ -115,9 +112,7 @@ class IterationManager:
         self.confidence_scores: Dict[str, float] = {}
 
     def update_hypotheses(
-        self,
-        new_hypotheses: List[Hypothesis],
-        confidence_scores: Dict[str, float]
+        self, new_hypotheses: List[Hypothesis], confidence_scores: Dict[str, float]
     ) -> None:
         """更新当前假设状态"""
         self.current_hypotheses = new_hypotheses
@@ -135,22 +130,22 @@ class HypothesisGenerator:
         current_notes = initial_notes
         while self.iteration_count < self.max_iterations:
             analysis = self.analyze_notes(current_notes)
-            if analysis['improvement_needed'] == False:
+            if analysis["improvement_needed"] == False:
                 break
-                
+
             current_notes = self.refine_notes(current_notes, analysis)
             self.iteration_count += 1
-        
+
         return self._finalize_notes(current_notes)
 
     def analyze_notes(self, notes):
         """Perform multi-faceted quality analysis"""
         analysis = {
-            'coverage_gaps': self._find_coverage_gaps(notes),
-            'redundancies': self._find_redundancies(notes),
-            'structural_issues': self._check_structure(notes)
+            "coverage_gaps": self._find_coverage_gaps(notes),
+            "redundancies": self._find_redundancies(notes),
+            "structural_issues": self._check_structure(notes),
         }
-        analysis['improvement_needed'] = any(analysis.values())
+        analysis["improvement_needed"] = any(analysis.values())
         return analysis
 
     def refine_notes(self, notes, analysis):

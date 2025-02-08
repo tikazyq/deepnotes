@@ -8,3 +8,10 @@ Jinja2~=3.1.5
 pandas>=2.2.3
 openai>=1.61.1
 httpx[socks]
+pytest>=8.3.4
+PyPDF2>=3.0.1
+python-docx>=1.1.2
+python-pptx>=1.0.2
+openpyxl>=3.1.5
+llama-index-core>=0.12.16.post1
+autogen-ext[file-surfer]

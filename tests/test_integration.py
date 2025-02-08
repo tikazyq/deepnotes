@@ -1,6 +1,6 @@
 from typing import cast
 
-from deepnotes.main import DeepNotesEngine
+from deepnotes.engine import DeepNotesEngine
 from deepnotes.models import IntermediateDataModel
 
 
@@ -16,7 +16,7 @@ def test_full_pipeline(test_db, sample_data: IntermediateDataModel):
     # Verify outputs
     data_model = cast(IntermediateDataModel, engine.data_model)
     assert len(data_model.entities) >= 2
-    assert any(e.attributes['name'] == "Test Entity 1" for e in data_model.entities)
+    assert any(e.attributes["name"] == "Test Entity 1" for e in data_model.entities)
     assert len(data_model.notes) > 0
 
     # Check report structure
@@ -37,7 +37,9 @@ def test_note_evolution(test_db):
     # Verify note improvement across iterations
     notes = engine.data_model.notes
     for i in range(1, len(notes)):
-        assert len(notes[i]["summary"].get("key_findings", [])) >= len(notes[i - 1]["summary"].get("key_findings", []))
+        assert len(notes[i]["summary"].get("key_findings", [])) >= len(
+            notes[i - 1]["summary"].get("key_findings", [])
+        )
         assert notes[i]["timestamp"] > notes[i - 1]["timestamp"]
 
 

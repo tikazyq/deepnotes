@@ -175,3 +175,5 @@ cython_debug/
 
 *.sqlite
 *.DS_Store
+
+data/

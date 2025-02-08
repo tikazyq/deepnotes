@@ -39,33 +39,6 @@ class BaseDataProcessor(ABC):
         return self.processed_data
 
     @abstractmethod
-    def process(self) -> Dict[str, Any]:
+    def process(self):
         """Process data and return structured results"""
         pass
-
-
-class BaseProcessor:
-    """Base class for all data processors"""
-    def __init__(self, source_data):
-        self.source_data = source_data
-        self._validate_data()
-
-    def _validate_data(self):
-        """Ensure input data meets processor requirements"""
-        if not self.source_data:
-            raise ValueError("Empty source data provided")
-
-    def preprocess(self):
-        """Common preprocessing steps"""
-        # Add language detection, formatting, etc. here
-        raise NotImplementedError
-
-    def generate_notes(self, **kwargs):
-        """Generate initial structured notes"""
-        # To be implemented by specific processors
-        raise NotImplementedError
-
-    def analyze_coverage(self, generated_notes):
-        """Analyze information coverage vs source data"""
-        # Common analysis framework
-        raise NotImplementedError

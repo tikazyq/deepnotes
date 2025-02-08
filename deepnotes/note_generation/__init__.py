@@ -3,13 +3,13 @@
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
 from ..config import LLMConfig
 from ..llm import LLMWrapper
-from ..models import IntermediateDataModel
+from ..models.models import IntermediateDataModel
 
 
 class NoteGenerator:
@@ -21,7 +21,7 @@ class NoteGenerator:
         self,
         data_model: IntermediateDataModel,
         previous_notes: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         context = context or {}
         prompt = self._build_prompt(
@@ -53,7 +53,9 @@ class NoteGenerator:
         Output format: JSON with sections for key_findings, relationships, and uncertainties
         """
 
-    def _parse_output(self, raw_output: Any, data_model: IntermediateDataModel) -> Dict[str, Any]:
+    def _parse_output(
+        self, raw_output: Any, data_model: IntermediateDataModel
+    ) -> Dict[str, Any]:
         # TODO: Implement actual parsing logic
         return {
             "summary": raw_output,
@@ -65,12 +67,14 @@ class NoteGenerator:
         """Improved entity extraction from JSON content"""
         try:
             import json
+
             data = json.loads(content)
             # Look for actual entities structure in the response
-            return data.get('entities', []) or data.get('key_findings', [])[:3]
+            return data.get("entities", []) or data.get("key_findings", [])[:3]
         except json.JSONDecodeError:
             # Fallback to simple text parsing
-            return [line.strip() for line in content.split('\n')
-                   if 'entity' in line.lower()][:3]
+            return [
+                line.strip() for line in content.split("\n") if "entity" in line.lower()
+            ][:3]
         except Exception:
             return []

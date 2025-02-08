@@ -14,6 +14,7 @@ class DataProcessorFactory:
         """
         processor_map = {
             "database": (DatabaseProcessor, DatabaseProcessorConfig),
+            "document": (DocumentProcessor, DocumentProcessorConfig),
             # Add new processor types here
         }
 
