@@ -7,7 +7,10 @@ from deepnotes.llm.client import get_model_client
 
 class DocumentProcessorAgent(FileSurfer):
     def __init__(self):
-        super().__init__(name="DocumentProcessorAgent", model_client=get_model_client())
+        super().__init__(
+            name="DocumentProcessorAgent",
+            model_client=get_model_client(),
+        )
 
 
 async def run():
