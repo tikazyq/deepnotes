@@ -11,13 +11,15 @@ class DeepNotesEngine:
 
     def run(self, target_path: str):
         processed_results = self.document_processor.process(target_path)
+        for result in processed_results:
+            print(result.model_dump_json(indent=2))
         return self.knowledge_processor.merge_analysis(processed_results)
 
 
 
 if __name__ == "__main__":
     engine = DeepNotesEngine()
-    result = engine.run(
+    knowledge_base = engine.run(
         os.getenv("DEEPNOTES_TARGET_PATH"),
     )
-    print(result.model_dump_json(indent=2))
+    print(knowledge_base.model_dump_json(indent=2))

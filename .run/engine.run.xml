@@ -29,7 +29,7 @@
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
-      <env name="DEEPNOTES_TARGET_PATH" value="$PROJECT_DIR$/data/2502.04747v1.pdf" />
+      <env name="DEEPNOTES_TARGET_PATH" value="$PROJECT_DIR$/data/转危为安：老乡鸡的三次危机.pdf" />
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
     <option name="SDK_HOME" value="" />

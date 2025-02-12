@@ -96,17 +96,22 @@ class LLMWrapper:
 
         return original_response
 
-    def _generate_with_retry(self, prompt: str, parse_json: bool) -> LLMResponse:
+    def _generate_with_retry(self, prompt: str, parse_json: bool) -> LLMResponse | None:
         """Base generation method with retry logic"""
         max_retries = 5
         backoff_factor = 1.5
         for attempt in range(max_retries):
             try:
-                # Add system prompt with language configuration
+                # Modified system prompt with language adaptation
+                if self.config.language.lower() == "chinese":
+                    system_content = "你是一个全能助手，能够理解所有语言，但请始终使用中文回答。你的回答必须使用中文，并保持简洁准确。"
+                else:
+                    system_content = f"You are a helpful assistant who understands all languages. Please respond in {self.config.language} using clear and natural expressions."
+
                 messages = [
                     {
                         "role": "system",
-                        "content": f"You are a helpful assistant. Always respond in {self.config.language} language."
+                        "content": system_content
                     },
                     {
                         "role": "user",
