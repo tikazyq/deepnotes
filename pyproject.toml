@@ -1,34 +1,54 @@
 [project]
 name = "deepnotes"
 version = "0.1.0"
+description = "AI-powered knowledge extraction and organization framework"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Marvin Zhang", email = "tikazyq@163.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "pydantic>=2.0",
-    "sqlalchemy>=2.0",
     "pyyaml>=6.0",
-    "jinja2>=3.1",
-    "pandas>=2.0"
+    "python-dotenv>=0.19.0",
+    "tqdm>=4.0.0",
+    "sqlalchemy>=1.4.0",
+    "httpx[socks]>=0.19.0",
 ]
 
 [build-system]
-requires = ["setuptools>=42"]
+requires = ["setuptools>=65.5.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 lint.select = ["F", "E", "W", "I", "B", "C4", "PL"]
 lint.ignore = [
-  "B904",  # abstract base class with empty __slots__
-  "E501",  # line-too-long (handled by formatter)
-  "PLR0913"  # too-many-arguments
+    "B904", # abstract base class with empty __slots__
+    "E501", # line-too-long (handled by formatter)
+    "PLR0913"  # too-many-arguments
 ]
 line-length = 88
 exclude = [
-  ".venv",
-  "__pycache__",
-  "build",
-  "dist"
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist"
 ]
 target-version = "py312"
 
 [tool.ruff.format]
 docstring-code-format = true
-docstring-code-line-length = "dynamic" 
+docstring-code-line-length = "dynamic"
+
+[project.scripts]
+deepnotes = "deepnotes.main:run_pipeline"
+
+[tool.setuptools.package-data]
+deepnotes = ["config.yml"]
+
+[tool.setuptools.packages.find]
+where = ["."] 
