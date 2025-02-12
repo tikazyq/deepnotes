@@ -6,7 +6,7 @@ from typing import List, Optional
 from tqdm import tqdm
 
 from deepnotes.llm.llm_wrapper import get_llm_model
-from deepnotes.loaders.document_loader import DocumentLoader
+from deepnotes.loaders.document_loader import DocumentLoader, DocumentProcessorConfig
 from deepnotes.models.models import (
     ChunkAnalysisResult,
     ConsolidationAnalysisResult,
@@ -17,12 +17,25 @@ from deepnotes.models.models import (
 
 
 class DocumentProcessor:
-    def __init__(self):
+    def __init__(self, config: dict = None):
         """
         Initializes the first-layer document processor.
         """
         self.llm_model = get_llm_model()
-        self.loader = DocumentLoader()
+        self.config = config or {}
+
+        # Get chunking config with defaults
+        chunk_config = self.config.get("text_processing", {})
+        self.loader = DocumentLoader(
+            DocumentProcessorConfig(
+                chunk_size=chunk_config.get("chunk_size", 1000),
+                chunk_overlap=chunk_config.get("chunk_overlap", 100),
+            )
+        )
+
+        # Set default concurrency if not configured
+        self.doc_concurrency = self.config.get("document_processing", os.cpu_count() or 4)
+        self.chunk_concurrency = self.config.get("chunk_processing", os.cpu_count() or 4)
 
     def process(self, target_path: str):
         """
@@ -31,7 +44,10 @@ class DocumentProcessor:
             target_path (str): Path to the document file or directory
         """
         if os.path.isfile(target_path):
-            return self.process_document(target_path)
+            result = self.process_document(target_path)
+            if result:
+                return [result]
+            return []
         elif os.path.isdir(target_path):
             return self.process_directory(target_path)
         else:
@@ -69,7 +85,7 @@ class DocumentProcessor:
         fusion_results = []
 
         # Process documents in parallel
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=self.doc_concurrency) as executor:
             futures = [
                 executor.submit(self.process_document, document_path)
                 for document_path in document_paths
@@ -99,7 +115,7 @@ class DocumentProcessor:
         analysis_results = []
 
         # Process chunks in parallel
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=self.chunk_concurrency) as executor:
             futures = [
                 executor.submit(self._analyze_chunk, chunk_content, chunk_index)
                 for chunk_index, chunk_content in enumerate(document_chunks)
@@ -140,11 +156,21 @@ class DocumentProcessor:
             )
 
         prompt = self._create_consolidation_prompt(chunk_analysis_results)
-        llm_response = self.llm_model.generate(
-            prompt, response_model=ConsolidationAnalysisResult
-        )
-        result = llm_response.model_instance
 
+        # Initialize progress with chunk count
+        total_chunks = len(chunk_analysis_results)
+        with tqdm(total=total_chunks,
+                 desc=f"Consolidating {total_chunks} chunks",
+                 bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} chunks") as pbar:
+
+            llm_response = self.llm_model.generate(
+                prompt,
+                response_model=ConsolidationAnalysisResult,
+            )
+
+            pbar.update(total_chunks)
+
+        result = llm_response.model_instance
         return result
 
     def _analyze_chunk(self, chunk_content, chunk_index):

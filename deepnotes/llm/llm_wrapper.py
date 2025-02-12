@@ -1,36 +1,28 @@
 import os
-from pathlib import Path
+import time
 from typing import Optional
 
-import yaml
 from dotenv import load_dotenv
-from openai import AzureOpenAI, OpenAI
+from openai import APIError, AzureOpenAI, OpenAI, RateLimitError
 from openai.types.chat import ChatCompletion
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from deepnotes.config.config import get_config
 
 load_dotenv()  # Load environment variables from .env
 
 
 class LLMResponse(BaseModel):
     content: str
+    provider: str
     model: str
     input_tokens: int
     output_tokens: int
     model_instance: Optional[BaseModel] = None
 
 
-def load_config():
-    config_path = Path("config.local.yml")
-    if not config_path.exists():
-        config_path = Path("config.example.yml")
-
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-    return config
-
-
 def get_provider_config(provider: str, model: str) -> dict:
-    config = load_config()
+    config = get_config()
     try:
         return config["llm"]["providers"][provider][model]
     except KeyError:
@@ -45,6 +37,8 @@ class LLMConfig(BaseModel):
     base_url: Optional[str]
     api_key: Optional[str]
     api_version: Optional[str]
+    language: str = Field(default="english", description="Output language for responses")
+    concurrency: Optional[dict] = None  # Add concurrency config
 
 
 class LLMWrapper:
@@ -75,7 +69,7 @@ class LLMWrapper:
         parse_json: bool = True,
         response_model: Optional[
             type[BaseModel]
-        ] = None,  # Add response model parameter
+        ] = None,
     ) -> LLMResponse:
         """Generate response with automatic validation and self-correction"""
         original_response = self._generate_with_retry(prompt, parse_json)
@@ -85,6 +79,7 @@ class LLMWrapper:
                 instance = response_model.model_validate_json(original_response.content)
                 return LLMResponse(
                     content=original_response.content,
+                    provider=original_response.provider,
                     model=original_response.model,
                     input_tokens=original_response.input_tokens,
                     output_tokens=original_response.output_tokens,
@@ -103,26 +98,58 @@ class LLMWrapper:
 
     def _generate_with_retry(self, prompt: str, parse_json: bool) -> LLMResponse:
         """Base generation method with retry logic"""
-        response: ChatCompletion = self.client.chat.completions.create(
-            model=self.config.model,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        max_retries = 5
+        backoff_factor = 1.5
+        for attempt in range(max_retries):
+            try:
+                # Add system prompt with language configuration
+                messages = [
+                    {
+                        "role": "system",
+                        "content": f"You are a helpful assistant. Always respond in {self.config.language} language."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
 
-        response_content = response.choices[0].message.content
-        if "<think>" and "</think>" in response_content:
-            response_content = response_content.split("</think>")[1]
+                response: ChatCompletion = self.client.chat.completions.create(
+                    model=self.config.model,
+                    messages=messages,
+                )
 
-        if parse_json and response_content.strip().startswith("```"):
-            response_content = self._extract_json_from_markdown(
-                response_content.strip()
-            )
+                # Handle streaming response
+                response_content = response.choices[0].message.content
+                input_tokens = response.usage.prompt_tokens
+                output_tokens = response.usage.completion_tokens
 
-        return LLMResponse(
-            content=response_content,
-            model=response.model,
-            input_tokens=response.usage.prompt_tokens,
-            output_tokens=response.usage.completion_tokens,
-        )
+                # Original non-streaming handling
+                if "</think>" in response_content and "<think>" in response_content:
+                    response_content = response_content.split("</think>")[1]
+
+                if parse_json and response_content.strip().startswith("```"):
+                    response_content = self._extract_json_from_markdown(
+                        response_content.strip()
+                    )
+
+                return LLMResponse(
+                    content=response_content,
+                    provider=self.config.provider,
+                    model=self.config.model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                )
+            except RateLimitError:
+                if attempt >= max_retries - 1:
+                    raise
+                sleep_time = backoff_factor ** attempt
+                print(f"Rate limited, retrying in {sleep_time:.1f}s...")
+                time.sleep(sleep_time)
+            except APIError as e:
+                if e.status_code == 502 and attempt < max_retries - 1:
+                    continue  # Retry on bad gateway
+                raise
 
     def _correct_and_validate(
         self,
@@ -149,9 +176,9 @@ class LLMWrapper:
         correction_prompt = f"""
         JSON validation failed multiple times. Error history:
         {error_history}
-        
+
         Original prompt: {original_prompt}
-        
+
         Please carefully correct the JSON to match the required schema.
         Respond ONLY with the corrected JSON between ```json markers.
         """
@@ -164,6 +191,7 @@ class LLMWrapper:
             instance = response_model.model_validate_json(corrected_response.content)
             return LLMResponse(
                 content=corrected_response.content,
+                provider=corrected_response.provider,
                 model=corrected_response.model,
                 input_tokens=corrected_response.input_tokens,
                 output_tokens=corrected_response.output_tokens,
@@ -196,7 +224,7 @@ class LLMWrapper:
 
 
 def get_llm_model(provider: str = None, model: str = None) -> LLMWrapper:
-    config = load_config()
+    config = get_config()
     if not provider:
         provider = config["llm"].get("default_provider")
     if not model:
@@ -205,7 +233,7 @@ def get_llm_model(provider: str = None, model: str = None) -> LLMWrapper:
     if provider and model:
         provider_config = get_provider_config(provider, model)
         llm_config = LLMConfig(
-            provider=provider_config["provider"],
+            provider=provider,
             model=provider_config["model_name"],
             base_url=provider_config["base_url"],
             api_key=os.getenv(

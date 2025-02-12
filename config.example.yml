@@ -7,9 +7,33 @@ deepnotes:
       query: "SELECT FROM research_data"
       connection_params:
         uri: "postgresql://${DB_USER}:${DB_PASS}@localhost/research"
+  text_processing:
+    chunk_size: 1000
+    chunk_overlap: 100
 
 llm:
-  provider: "openai"
-  model: "gpt-4o"
-  base_url: "https://api.example.com/v1"
-  api_key: "${LLM_API_KEY}"
+  default_provider: "openai"
+  default_model: "gpt-4o"
+  language: "english"
+  providers:
+    openai:
+      gpt-4o:
+        api_key: "${OPENAI_API_KEY}"
+    azure:
+      gpt-4o:
+        base_url: "https://example.azure.com/openai/v1"
+        api_key: "${AZURE_LLM_API_KEY}"
+        api_version: "2025-01-01"
+        model: "gpt-4o"
+  concurrency:
+    document_processing: 4
+    chunk_processing: 8
+
+graph:
+  storage_type: "memory"
+  networkx:
+    graph_file: "./data/knowledge_graph.graphml"
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "${NEO4J_USER}"
+    password: "${NEO4J_PASSWORD}"

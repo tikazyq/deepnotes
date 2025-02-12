@@ -1,19 +1,23 @@
+import os
+
 from deepnotes.processors.document_processor import DocumentProcessor
-from deepnotes.processors.fusion_processor import FusionProcessor
+from deepnotes.processors.knowledge_processor import KnowledgeProcessor
 
 
 class DeepNotesEngine:
     def __init__(self):
         self.document_processor = DocumentProcessor()
-        self.fusion_processor = FusionProcessor()
+        self.knowledge_processor = KnowledgeProcessor()
 
     def run(self, target_path: str):
-        return self.document_processor.process(target_path)
+        processed_results = self.document_processor.process(target_path)
+        return self.knowledge_processor.merge_analysis(processed_results)
+
 
 
 if __name__ == "__main__":
     engine = DeepNotesEngine()
     result = engine.run(
-        "/home/marvin/projects/tikazyq/deepnotes/data/academic/2410.04415v1.pdf"
+        os.getenv("DEEPNOTES_TARGET_PATH"),
     )
     print(result.model_dump_json(indent=2))

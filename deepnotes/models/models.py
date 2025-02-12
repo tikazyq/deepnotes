@@ -37,6 +37,10 @@ class Relationship(BaseModel):
         default_factory=dict, description="Metadata"
     )
 
+    @property
+    def id(self):
+        return f"{self.source}__{self.type}__{self.target}"
+
 
 class KnowledgeGraph(BaseModel):
     """Knowledge graph representation"""
