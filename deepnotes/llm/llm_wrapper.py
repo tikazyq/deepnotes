@@ -130,16 +130,32 @@ class LLMWrapper:
         invalid_json: str,
         error: Exception,
         response_model: type[BaseModel],
+        max_retries: int = 3,
+        previous_errors: list[str] = None,
     ) -> LLMResponse:
-        """Handle JSON correction and validation"""
-        correction_prompt = f"""
-        JSON validation failed with error: {str(error)}
-        Original prompt: {original_prompt}
-        Invalid JSON content: {invalid_json}
+        """Handle JSON correction and validation with error history"""
+        previous_errors = previous_errors or []
+        previous_errors.append(f"Error: {str(error)}\nInvalid JSON: {invalid_json}")
 
-        Please correct the JSON to match the required schema.
+        if max_retries <= 0:
+            raise ValueError(
+                "Max retries exceeded. Errors:\n" + "\n".join(previous_errors)
+            )
+
+        error_history = "\n".join(
+            [f"Attempt {i + 1}: {e}" for i, e in enumerate(previous_errors)]
+        )
+
+        correction_prompt = f"""
+        JSON validation failed multiple times. Error history:
+        {error_history}
+        
+        Original prompt: {original_prompt}
+        
+        Please carefully correct the JSON to match the required schema.
         Respond ONLY with the corrected JSON between ```json markers.
         """
+
         corrected_response = self._generate_with_retry(
             correction_prompt, parse_json=True
         )
@@ -154,7 +170,15 @@ class LLMWrapper:
                 model_instance=instance,
             )
         except Exception as e:
-            raise ValueError(f"Failed to correct JSON after error: {str(e)}")
+            print(f"Correction failed (attempts left: {max_retries - 1}), retrying...")
+            return self._correct_and_validate(
+                original_prompt,
+                corrected_response.content,
+                e,
+                response_model,
+                max_retries - 1,
+                previous_errors,
+            )
 
     @staticmethod
     def _extract_json_from_markdown(markdown_text: str) -> str:
@@ -174,9 +198,9 @@ class LLMWrapper:
 def get_llm_model(provider: str = None, model: str = None) -> LLMWrapper:
     config = load_config()
     if not provider:
-        provider = config["llm"].get("default_provider", "openai")
+        provider = config["llm"].get("default_provider")
     if not model:
-        model = config["llm"]["providers"][provider].get("default_model", "gpt-4o")
+        model = config["llm"].get("default_model")
 
     if provider and model:
         provider_config = get_provider_config(provider, model)
@@ -190,6 +214,6 @@ def get_llm_model(provider: str = None, model: str = None) -> LLMWrapper:
             api_version=provider_config.get("api_version"),
         )
     else:
-        llm_config = LLMConfig()
+        raise ValueError("Provider and model must be specified or set as default.")
 
     return LLMWrapper(llm_config)

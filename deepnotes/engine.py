@@ -13,5 +13,7 @@ class DeepNotesEngine:
 
 if __name__ == "__main__":
     engine = DeepNotesEngine()
-    result = engine.run("/home/marvin/projects/tikazyq/deepnotes/data/academic")
-    print(result)
+    result = engine.run(
+        "/home/marvin/projects/tikazyq/deepnotes/data/academic/2410.04415v1.pdf"
+    )
+    print(result.model_dump_json(indent=2))

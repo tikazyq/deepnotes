@@ -4,9 +4,16 @@ from pydantic import BaseModel, Field
 
 
 class Entity(BaseModel):
-    id: str
-    name: str
-    type: str
+    id: str = Field(
+        description="Unique identifier for the entity. Naming convention: snake_case of entity name"
+    )
+    name: str = Field(description="Name of the entity")
+    description: Optional[str] = Field(
+        default=None, description="Description of the entity, if available"
+    )
+    type: str = Field(
+        description="Type of the entity (e.g., 'concept', 'company', etc.)"
+    )
     attributes: Optional[Dict[str, Any]] = Field(
         default_factory=dict, description="Additional attributes"
     )
@@ -46,7 +53,7 @@ class LoadedData(BaseModel):
 
 
 class ChunkAnalysisResult(BaseModel):
-    """Chunk analysis result"""
+    """Analysis result for each chunk of the target item"""
 
     chunk_index: Optional[int] = Field(
         default=None, description="Index of the chunk in the document"
@@ -63,8 +70,15 @@ class ChunkAnalysisResult(BaseModel):
 
 
 class ConsolidationAnalysisResult(BaseModel):
-    """Consolidation analysis result of chunks"""
+    """Consolidation analysis result of the target item"""
 
-    knowledge_graph: Optional[KnowledgeGraph] = Field(default=None)
-    summary: Optional[str] = Field(default=None)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    knowledge_graph: Optional[KnowledgeGraph] = Field(
+        default=None, description="Knowledge graph of the target item"
+    )
+    summary: Optional[str] = Field(
+        default=None,
+        description="Overall document summary. Should be comprehensive and provide an overview of the target item.",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Metadata information"
+    )
