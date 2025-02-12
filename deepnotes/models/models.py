@@ -17,7 +17,7 @@ class Entity(BaseModel):
     attributes: Optional[Dict[str, Any]] = Field(
         default_factory=dict, description="Additional attributes"
     )
-    metadata: Optional[Dict[str, str]] = Field(
+    metadata: Optional[Dict[str, Any]] = Field(
         default_factory=dict, description="Metadata"
     )
 
