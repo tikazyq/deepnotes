@@ -8,7 +8,7 @@ import networkx as nx
 from neo4j import GraphDatabase
 
 from deepnotes.config.config import get_config
-from deepnotes.models.models import Entity, KnowledgeGraph, Relationship
+from deepnotes.models.analyzer_models import Entity, KnowledgeGraph, Relationship
 
 
 class GraphStorage(ABC):
@@ -35,6 +35,7 @@ class GraphStorage(ABC):
     @abstractmethod
     def get_knowledge_graph(self) -> KnowledgeGraph:
         pass
+
 
 class NetworkXStorage(GraphStorage):
     def __init__(self, graph_file: Path):
@@ -91,10 +92,10 @@ class NetworkXStorage(GraphStorage):
     def get_knowledge_graph(self) -> KnowledgeGraph:
         entities = [Entity(**data) for _, data in self.graph.nodes(data=True)]
         relationships = [
-            Relationship(**data)
-            for _, _, data in self.graph.edges(data=True)
+            Relationship(**data) for _, _, data in self.graph.edges(data=True)
         ]
         return KnowledgeGraph(entities=entities, relationships=relationships)
+
 
 class Neo4jStorage(GraphStorage):
     def __init__(self, uri: str, user: str, password: str):
@@ -104,10 +105,9 @@ class Neo4jStorage(GraphStorage):
         with self.driver.session() as session:
             session.execute_write(
                 lambda tx: tx.run(
-                    "MERGE (e:Entity {id: $id}) "
-                    "SET e += $props RETURN e",
+                    "MERGE (e:Entity {id: $id}) SET e += $props RETURN e",
                     id=entity.id,
-                    props=entity.model_dump(exclude_unset=True)
+                    props=entity.model_dump(exclude_unset=True),
                 )
             )
         return entity
@@ -116,8 +116,7 @@ class Neo4jStorage(GraphStorage):
         with self.driver.session() as session:
             result = session.execute_read(
                 lambda tx: tx.run(
-                    "MATCH (e:Entity {id: $id}) RETURN e",
-                    id=entity_id
+                    "MATCH (e:Entity {id: $id}) RETURN e", id=entity_id
                 ).single()
             )
             return Entity(**result["e"]) if result else None
@@ -126,8 +125,7 @@ class Neo4jStorage(GraphStorage):
         with self.driver.session() as session:
             result = session.execute_read(
                 lambda tx: tx.run(
-                    "MATCH ()-[r {id: $id}]->() RETURN r",
-                    id=rel_id
+                    "MATCH ()-[r {id: $id}]->() RETURN r", id=rel_id
                 ).single()
             )
             return Relationship(**result["r"]) if result else None
@@ -170,13 +168,15 @@ class Neo4jStorage(GraphStorage):
                     id=rel.id,
                     source=rel.source,
                     target=rel.target,
-                    props=rel.model_dump(exclude_unset=True)
+                    props=rel.model_dump(exclude_unset=True),
                 )
             )
         return rel
 
+
 class MemoryStorage(GraphStorage):
     """In-memory graph storage using dictionaries"""
+
     def __init__(self):
         self.entities: dict[str, Entity] = {}
         self.relationships: dict[str, Relationship] = {}
@@ -215,13 +215,14 @@ class MemoryStorage(GraphStorage):
     def get_knowledge_graph(self) -> KnowledgeGraph:
         return KnowledgeGraph(
             entities=list(self.entities.values()),
-            relationships=list(self.relationships.values())
+            relationships=list(self.relationships.values()),
         )
 
     def clear(self):
         """Clear all stored data (for testing)"""
         self.entities.clear()
         self.relationships.clear()
+
 
 def get_graph_storage() -> GraphStorage:
     """Factory method to create graph storage based on configuration"""
@@ -238,7 +239,7 @@ def get_graph_storage() -> GraphStorage:
         storage = Neo4jStorage(
             uri=config["graph"]["neo4j"]["uri"],
             user=os.path.expandvars(config["graph"]["neo4j"]["user"]),
-            password=os.path.expandvars(config["graph"]["neo4j"]["password"])
+            password=os.path.expandvars(config["graph"]["neo4j"]["password"]),
         )
     else:
         raise ValueError(f"Unsupported graph storage type: {storage_type}")

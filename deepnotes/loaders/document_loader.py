@@ -1,9 +1,16 @@
 import os
 
-from pydantic import BaseModel, Field
-
 from deepnotes.loaders.base_loader import BaseLoader
-from deepnotes.models.models import LoadedData
+from deepnotes.models.loader_models import (
+    DocumentChunk,
+    DocumentLoadedData,
+    FileMetadata,
+    ProcessedDocument,
+)
+from deepnotes.models.source_models import (
+    SourceConfig,
+    SourceType,
+)
 
 # PDF processing: PyPDF2
 try:
@@ -38,14 +45,16 @@ except ImportError:
     TokenTextSplitter = None
 
 
-class DocumentProcessorConfig(BaseModel):
-    chunk_size: int = Field(default=1000)
-    chunk_overlap: int = Field(default=100)
-
-
 class DocumentLoader(BaseLoader):
-    def __init__(self, config: DocumentProcessorConfig = None):
-        self.config = config or DocumentProcessorConfig()
+    def __init__(self, config: SourceConfig):
+        super().__init__(config)
+
+    @classmethod
+    def get_source_type(cls) -> SourceType:
+        return SourceType.DOCUMENT
+
+    def validate_config(self) -> bool:
+        return "path" in self.config.connection
 
     @staticmethod
     def _extract_pdf(file_path: str) -> str:
@@ -86,8 +95,38 @@ class DocumentLoader(BaseLoader):
             text.append(f"=== Sheet: {sheet_name} ===\n{df.to_string(index=False)}")
         return "\n\n".join(text)
 
-    def process(self, file_path: str) -> LoadedData:
-        """Extract raw text from document based on file type"""
+    def process(self) -> DocumentLoadedData:
+        """Process a file or directory"""
+        target_path = self.config.connection["path"]
+
+        if not os.path.exists(target_path):
+            raise FileNotFoundError(f"Path not found: {target_path}")
+
+        loaded_docs = []
+        file_types = set()
+
+        if os.path.isdir(target_path):
+            for root, _, files in os.walk(target_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    loaded_docs.append(self._process_single_file(file_path))
+                    file_types.add(os.path.splitext(file)[1].lower())
+        else:
+            loaded_docs.append(self._process_single_file(target_path))
+            file_types.add(os.path.splitext(target_path)[1].lower())
+
+        return DocumentLoadedData(
+            source_type=SourceType.DOCUMENT,
+            global_metadata={
+                "source_path": target_path,
+                "file_types": list(file_types),
+                "total_chunks": sum(len(d.chunks) for d in loaded_docs),
+            },
+            documents=loaded_docs,
+        )
+
+    def _process_single_file(self, file_path: str) -> ProcessedDocument:
+        """Process individual file and return structured data"""
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Document not found: {file_path}")
 
@@ -114,11 +153,21 @@ class DocumentLoader(BaseLoader):
         if not TokenTextSplitter:
             raise ImportError("llama-index required for text splitting")
         splitter = TokenTextSplitter(
-            chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap
+            chunk_size=self.config.options.get("chunk_size", 2000),
+            chunk_overlap=self.config.options.get("chunk_overlap", 200),
         )
         chunks = splitter.split_text(content)
 
-        return LoadedData(
-            metadata={"file_path": file_path},
-            raw_data=[{"text": chunk} for index, chunk in enumerate(chunks)],
+        return ProcessedDocument(
+            metadata=FileMetadata(
+                file_path=file_path,
+                file_size=os.path.getsize(file_path),
+                file_type=ext,
+                created_at=str(os.path.getctime(file_path)),
+                updated_at=str(os.path.getmtime(file_path)),
+            ),
+            chunks=[
+                DocumentChunk(text=chunk, index=idx) for idx, chunk in enumerate(chunks)
+            ],
+            raw_content=content,
         )

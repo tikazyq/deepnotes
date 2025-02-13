@@ -19,10 +19,14 @@ def load_config():
             with open(path) as f:
                 return yaml.safe_load(f)
 
-    raise FileNotFoundError("No configuration file found in hierarchy: " +
-                           ", ".join(str(p) for p in config_paths))
+    raise FileNotFoundError(
+        "No configuration file found in hierarchy: "
+        + ", ".join(str(p) for p in config_paths)
+    )
+
 
 _config = load_config()
+
 
 def get_config() -> dict:
     return _config

@@ -37,7 +37,9 @@ class LLMConfig(BaseModel):
     base_url: Optional[str]
     api_key: Optional[str]
     api_version: Optional[str]
-    language: str = Field(default="english", description="Output language for responses")
+    language: str = Field(
+        default="english", description="Output language for responses"
+    )
     concurrency: Optional[dict] = None  # Add concurrency config
 
 
@@ -67,9 +69,7 @@ class LLMWrapper:
         self,
         prompt: str,
         parse_json: bool = True,
-        response_model: Optional[
-            type[BaseModel]
-        ] = None,
+        response_model: Optional[type[BaseModel]] = None,
     ) -> LLMResponse:
         """Generate response with automatic validation and self-correction"""
         original_response = self._generate_with_retry(prompt, parse_json)
@@ -109,14 +109,8 @@ class LLMWrapper:
                     system_content = f"You are a helpful assistant who understands all languages. Please respond in {self.config.language} using clear and natural expressions."
 
                 messages = [
-                    {
-                        "role": "system",
-                        "content": system_content
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": prompt},
                 ]
 
                 response: ChatCompletion = self.client.chat.completions.create(
@@ -148,7 +142,7 @@ class LLMWrapper:
             except RateLimitError:
                 if attempt >= max_retries - 1:
                     raise
-                sleep_time = backoff_factor ** attempt
+                sleep_time = backoff_factor**attempt
                 print(f"Rate limited, retrying in {sleep_time:.1f}s...")
                 time.sleep(sleep_time)
             except APIError as e:

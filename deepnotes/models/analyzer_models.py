@@ -49,13 +49,6 @@ class KnowledgeGraph(BaseModel):
     relationships: List[Relationship] = Field(default_factory=list)
 
 
-class LoadedData(BaseModel):
-    """Loaded data from loader"""
-
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    raw_data: List[Dict[str, Any]] = Field(default_factory=list)
-
-
 class ChunkAnalysisResult(BaseModel):
     """Analysis result for each chunk of the target item"""
 

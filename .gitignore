@@ -181,3 +181,4 @@ data/
 *.local.*
 
 *.key
+*.db
