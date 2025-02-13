@@ -1,135 +1,131 @@
 # DeepNotes
 
-DeepNotes is an AI-powered note generation system that combines multiple data sources with large language models (LLMs)
-to create and iteratively refine structured notes through an intelligent processing pipeline.
+DeepNotes is an AI-powered knowledge extraction and organization framework that processes documents and builds a semantic knowledge graph using large language models (LLMs).
 
-## Key Features
+## Features
 
-- **Iterative Processing**: Multi-stage refinement of notes with convergence detection
-- **Multi-source Data Integration**:
-    - Database connectors (SQL)
-    - Document processors (Markdown, PDF)
-    - Code analysis
-- **Structured Output**:
-    - Technical reports
-    - Executive summaries
-    - Process audit trails
-- **LLM Integration**:
-    - OpenAI-compatible API support
-    - Cost tracking and token monitoring
-    - Customizable templates
-- **Extensible Architecture**:
-    - Plugin-based data processors
-    - Configurable processing pipelines
-    - Modular report generators
+- **Document Processing**
+  - Support for PDF, Word (DOCX), PowerPoint (PPTX), and Excel (XLSX) documents
+  - Intelligent chunking with configurable size and overlap
+  - Parallel processing of documents and chunks
+  
+- **Knowledge Extraction**
+  - Entity and relationship extraction
+  - Automated knowledge graph construction
+  - Intelligent conflict resolution
+  - Duplicate detection and merging
+
+- **Storage Options**
+  - In-memory storage for testing
+  - NetworkX-based file storage
+  - Neo4j graph database support
+
+- **LLM Integration**
+  - OpenAI API support
+  - Azure OpenAI support
+  - Configurable models and parameters
+  - Multi-language support
 
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/deepnotes.git
+# Clone the repository
+git clone https://github.com/tikazyq/deepnotes.git
 cd deepnotes
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# For development
+pip install -r requirements-dev.txt
 ```
 
 ## Configuration
 
-Create `config.yml`:
-
-```yaml
-deepnotes:
-  database_uri: "sqlite:///test.db"
-  max_iterations: 3
-  output_formats: [ "json", "markdown" ]
-  data_sources:
-    - source_type: "database"
-      query: "SELECT * FROM employees"
-      connection_params:
-        uri: "sqlite:///test.db"
+1. Copy example configuration:
+```bash
+cp config.example.yml config.yml
 ```
 
+2. Copy environment variables:
+```bash
+cp .env.example .env
+```
+
+3. Configure your API keys in `.env`:
+```bash
+# OpenAI API key
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Azure OpenAI keys (if using Azure)
+AZURE_API_KEY=your_azure_api_key_here
+```
+
+4. Configure your settings in `config.yml`:
+
 ```yaml
-deepnotes:
-  database_uri: "sqlite:///notes.db"
-  max_iterations: 5
-  output_formats: [ "json", "markdown" ]
-  data_sources:
-    - source_type: "database"
-      query: "SELECT FROM research_data"
-      connection_params:
-        uri: "postgresql://user:pass@localhost/research"
 llm:
-  provider: "openai" # or "groq", "azure", "ollama"
-  model: "gpt-4-turbo"
-  base_url: "https://api.example.com/v1" # For custom endpoints
-  api_key: "${LLM_API_KEY}" # From environment
-  temperature: 0.7
-  max_tokens: 2000
+  default_provider: "openai"  # or "azure"
+  default_model: "gpt-4"
+  language: "english"  # or "chinese" for Chinese output
+  providers:
+    openai:
+      gpt-4:
+        api_key: "${OPENAI_API_KEY}"
+    azure:
+      gpt-4:
+        base_url: "https://your-endpoint.openai.azure.com"
+        api_key: "${AZURE_API_KEY}"
+        api_version: "2024-02-15"
+
+graph:
+  storage_type: "memory"  # or "networkx", "neo4j"
+  networkx:
+    graph_file: "./data/knowledge_graph.graphml"
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "${NEO4J_USER}"
+    password: "${NEO4J_PASSWORD}"
 ```
 
 ## Usage
 
+Basic usage:
+
 ```python
 from deepnotes import DeepNotesEngine
 
-# Initialize processing engine
-engine = DeepNotesEngine("config.yml")
-engine.initialize_processors()
+# Initialize engine
+engine = DeepNotesEngine()
 
-# Run full processing pipeline
-report = engine.run_pipeline()
+# Process a document or directory
+knowledge_graph = engine.run("path/to/document.pdf")
 
-# Access outputs
-print(report['executive_summary'])
-print(f"Process iterations: {len(engine.data_model.iteration_history)}")
-```
-
-## Project Structure
-
-```
-deepnotes/
-├── data_processing/ # Data connectors and processors
-├── llm/ # LLM integration and wrappers
-├── note_generation/ # Note templating and generation
-├── iterative/ # Iterative optimization logic
-├── reporting/ # Output formatting and templates
-├── models.py # Core data models
-├── config.py # Configuration management
-└── main.py # Main processing engine
+# The result includes entities and relationships
+print(knowledge_graph.model_dump_json(indent=2))
 ```
 
 ## Development
 
-1. Set up virtual environment:
+1. Install development dependencies:
+```bash
+pip install -r requirements-dev.txt
+```
 
-  ```bash
-  python -m venv .venv
-  source .venv/bin/activate
-  ```
+2. Run tests:
+```bash
+pytest
+```
 
-2. Install dependencies:
-
-  ```bash
-  pip install -r requirements.txt
-  ```
-
-3. Run tests:
-
-  ```bash
-  pytest
-  ```
-
-## Contributing
-
-We welcome contributions! Please see our:
-
-- [Contribution Guidelines](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Roadmap](ROADMAP.md)
+3. Format code:
+```bash
+ruff format .
+```
 
 ## License
 
-BSD 3-Clause License. See [LICENSE](LICENSE) for full text.
-
----
-
-**Project Status**: Active Development (v0.0.1)
+BSD 3-Clause License. See [LICENSE](LICENSE) for details.
