@@ -286,7 +286,7 @@ class ContentAnalyzer:
             return ConsolidationAnalysisResult(**latest_analysis.analysis_data)
 
         # Process new document
-        loaded_data = self.loader.process(document_path)
+        loaded_data = self.loader.process(target_path=document_path)
         document = self.document_store.store_document(
             document_path,
             content_hash,

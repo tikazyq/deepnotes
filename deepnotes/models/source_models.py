@@ -8,8 +8,8 @@ class SourceType(str, Enum):
     DOCUMENT = "document"
     DATABASE = "database"
     CODEBASE = "codebase"
+    WEB_DOCUMENT = "web_document"
     API = "api"
-
 
 class SourceConfig(BaseModel):
     type: SourceType

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from deepnotes.loaders.base_loader import BaseLoader
 from deepnotes.models.loader_models import (
@@ -95,9 +96,10 @@ class DocumentLoader(BaseLoader):
             text.append(f"=== Sheet: {sheet_name} ===\n{df.to_string(index=False)}")
         return "\n\n".join(text)
 
-    def process(self) -> DocumentLoadedData:
+    def process(self, *, target_path: Optional[str]=None) -> DocumentLoadedData:
         """Process a file or directory"""
-        target_path = self.config.connection["path"]
+        if not target_path:
+            target_path = self.config.connection["path"]
 
         if not os.path.exists(target_path):
             raise FileNotFoundError(f"Path not found: {target_path}")
@@ -148,7 +150,15 @@ class DocumentLoader(BaseLoader):
                 raise ImportError("pandas required for Excel processing")
             content = self._extract_excel(file_path)
         else:
-            raise ValueError(f"Unsupported file type: {ext}")
+            # Attempt to read as plain text if file is .txt or content is decodable
+            try:
+                # Verify text validity by attempting UTF-8 decode
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                raise ValueError(f"File appears to be binary: {file_path}")
+            except Exception as e:
+                raise ValueError(f"Error reading file {file_path}: {str(e)}")
 
         if not TokenTextSplitter:
             raise ImportError("llama-index required for text splitting")

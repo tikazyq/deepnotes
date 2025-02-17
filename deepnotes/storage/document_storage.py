@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, select
+from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, select, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
 
@@ -32,14 +32,14 @@ class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(Integer, foreign_key="documents.id")
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"))
     index: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
     meta_info: Mapped[Dict] = mapped_column(JSON)
 
     document: Mapped[Document] = relationship(back_populates="chunks")
     analysis_results: Mapped[List["ChunkAnalysis"]] = relationship(
-        back_populates="chunk"
+        back_populates="chunk", cascade="all, delete-orphan"
     )
 
 
@@ -47,7 +47,7 @@ class DocumentAnalysis(Base):
     __tablename__ = "document_analyses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(Integer, foreign_key="documents.id")
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"))
     analysis_data: Mapped[Dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -58,7 +58,7 @@ class ChunkAnalysis(Base):
     __tablename__ = "chunk_analyses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    chunk_id: Mapped[int] = mapped_column(Integer, foreign_key="document_chunks.id")
+    chunk_id: Mapped[int] = mapped_column(Integer, ForeignKey("document_chunks.id"))
     analysis_data: Mapped[Dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -67,7 +67,12 @@ class ChunkAnalysis(Base):
 
 class DocumentStore:
     def __init__(self, database_url: str):
-        self.engine = create_engine(database_url)
+        # Enable SQLite foreign key support
+        engine_args = {}
+        if database_url.startswith("sqlite"):
+            engine_args["connect_args"] = {"check_same_thread": False}
+            
+        self.engine = create_engine(database_url, **engine_args)
         Base.metadata.create_all(self.engine)
 
     def store_document(self, path: str, content_hash: str, metadata: Dict) -> Document:
