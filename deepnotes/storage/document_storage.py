@@ -2,7 +2,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text, create_engine, select, ForeignKey
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    select,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
 
@@ -71,7 +80,7 @@ class DocumentStore:
         engine_args = {}
         if database_url.startswith("sqlite"):
             engine_args["connect_args"] = {"check_same_thread": False}
-            
+
         self.engine = create_engine(database_url, **engine_args)
         Base.metadata.create_all(self.engine)
 
