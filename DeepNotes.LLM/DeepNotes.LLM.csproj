@@ -8,4 +8,9 @@
     <ProjectReference Include="..\DeepNotes.Core\DeepNotes.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="OpenAI" Version="2.1.0" />
+    <PackageReference Include="Polly" Version="8.5.2" />
+  </ItemGroup>
+
 </Project> 

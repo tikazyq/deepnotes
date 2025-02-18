@@ -1,5 +1,6 @@
 using DeepNotes.Database.SqlServer;
 using DeepNotes.Core.Interfaces;
+using DeepNotes.LLM;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +17,21 @@ builder.Services.AddDbContext<DeepNotesDbContext>(options =>
     {
         options.UseSqlServer(connectionString);
     }
+});
+
+// In your Program.cs
+builder.Services.AddSingleton<LLMService>(sp =>
+{
+    var config = new LLMConfig
+    {
+        Provider = builder.Configuration["LLM:Provider"],
+        Model = builder.Configuration["LLM:Model"],
+        BaseUrl = builder.Configuration["LLM:BaseUrl"],
+        ApiKey = builder.Configuration["LLM:ApiKey"],
+        ApiVersion = builder.Configuration["LLM:ApiVersion"],
+        Language = builder.Configuration["LLM:Language"] ?? "english"
+    };
+    return new LLMService(config);
 });
 
 builder.Services.AddScoped<IDocumentRepository, SqlDocumentRepository>();
@@ -38,4 +54,4 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
-app.Run(); 
+app.Run();
