@@ -60,7 +60,7 @@ class DatabaseLoader(BaseLoader):
             processed_tables.append(
                 TableSchema(
                     name=table_name,
-                    schema=table_info,
+                    schema_data=table_info,
                     sample_data=self._extract_sample_data(table_name),
                     metadata=FileMetadata(
                         file_path=f"{self.config.name}.{table_name}",

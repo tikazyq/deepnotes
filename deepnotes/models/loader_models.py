@@ -32,7 +32,7 @@ class TableSchema(BaseModel):
     """Database table schema representation"""
 
     name: str
-    schema: Dict[str, Any]
+    schema_data: Dict[str, Any]
     sample_data: List[Dict[str, Any]]
     metadata: FileMetadata
 

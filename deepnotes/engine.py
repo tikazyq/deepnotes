@@ -80,8 +80,8 @@ if __name__ == "__main__":
             type=SourceType.WEB_DOCUMENT,
             name="docs",
             connection={
-                'start_urls': ['https://microsoft.github.io/autogen/stable/user-guide/extensions-user-guide/index.html'],
-                'url_pattern': 'https://microsoft.github.io/autogen/stable/user-guide/extensions-user-guide/',
+                'start_urls': ['https://microsoft.github.io/autogen/stable/user-guide/core-user-guide/index.html'],
+                'url_pattern': 'https://microsoft.github.io/autogen/stable/user-guide/core-user-guide/',
             },
         ),
     ]

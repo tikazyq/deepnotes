@@ -149,8 +149,11 @@ class DocumentLoader(BaseLoader):
             if not pd:
                 raise ImportError("pandas required for Excel processing")
             content = self._extract_excel(file_path)
+        elif ext in (".txt", ".md"):
+            with open(file_path, 'r') as f:
+                content = f.read()
         else:
-            # Attempt to read as plain text if file is .txt or content is decodable
+            # Attempt to read as plain text if content is decodable
             try:
                 # Verify text validity by attempting UTF-8 decode
                 with open(file_path, 'r', encoding='utf-8') as f:

@@ -1,10 +1,7 @@
 import hashlib
-import json
-import os
-import tempfile
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional
+from asyncio import as_completed
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List
 
 from tqdm import tqdm
 
@@ -21,6 +18,7 @@ from deepnotes.models.loader_models import (
     CodeFile,
     DocumentLoadedData,
     LoadedData,
+    ProcessedDocument,
 )
 from deepnotes.models.source_models import SourceConfig, SourceType
 from deepnotes.storage.document_storage import DocumentStore
@@ -49,10 +47,10 @@ class ContentAnalyzer:
 
         # Set default concurrency if not configured
         self.doc_concurrency = self.config.get(
-            "document_processing", os.cpu_count() or 4
+            "document_processing", 8,
         )
         self.chunk_concurrency = self.config.get(
-            "chunk_processing", os.cpu_count() or 4
+            "chunk_processing", 4,
         )
 
         self.document_store = DocumentStore(
@@ -67,17 +65,7 @@ class ContentAnalyzer:
         """Route processing based on data type"""
         if data.data_type == "documents":
             doc_data = DocumentLoadedData(**data.model_dump())
-            results = []
-            for doc in tqdm(doc_data.documents, desc="Analyzing documents"):
-                with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-                    temp_file.write(doc.raw_content)
-                    temp_file.flush()
-                    result = self._process_document(temp_file.name)
-                    if result:
-                        result.source_metadata = doc.metadata.model_dump()
-                        results.append(result)
-                    os.unlink(temp_file.name)
-            return results
+            return self._analyze_documents(doc_data.documents)
         elif data.data_type == "codebase":
             return self._analyze_codebase(data.files, data.dependencies)
         elif data.data_type == "database":
@@ -111,20 +99,12 @@ class ContentAnalyzer:
         prompt = self._create_consolidation_prompt(chunk_analysis_results)
 
         # Initialize progress with chunk count
-        total_chunks = len(chunk_analysis_results)
-        with tqdm(
-            total=total_chunks,
-            desc=f"Consolidating {total_chunks} chunks",
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} chunks",
-        ) as pbar:
-            llm_response = self.llm_model.generate(
-                prompt,
-                response_model=ConsolidationAnalysisResult,
-            )
-
-            pbar.update(total_chunks)
-
+        llm_response = self.llm_model.generate(
+            prompt,
+            response_model=ConsolidationAnalysisResult,
+        )
         result = llm_response.model_instance
+
         return result
 
     @staticmethod
@@ -209,7 +189,7 @@ class ContentAnalyzer:
         """
         return prompt_template
 
-    def _analyze_chunk(self, chunk_content, chunk_index):
+    def _analyze_chunk(self, chunk_content: str, chunk_index: int) -> ChunkAnalysisResult:
         """
         Analyze a single document chunk.
         """
@@ -230,88 +210,33 @@ class ContentAnalyzer:
         self, files: List[CodeFile], dependencies: List[str]
     ) -> List[ConsolidationAnalysisResult]:
         """Analyze codebase structure and relationships"""
-        results = []
-        for file in tqdm(files, desc="Analyzing code files"):
-            if file.path.endswith(".py"):
-                with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-                    temp_file.write(file.content)
-                    temp_file.flush()
-                    result = self._process_document(temp_file.name)
-                    if result:
-                        result.source_metadata = file.metadata.model_dump()
-                        result.content_type = "code"
-                        results.append(result)
-                    os.unlink(temp_file.name)
-        return results
+        raise NotImplementedError("Codebase analysis not implemented yet")
 
     def _analyze_database(
         self, tables: List[Dict]
     ) -> List[ConsolidationAnalysisResult]:
         """Analyze database schema and data patterns"""
+        raise NotImplementedError("Database analysis not implemented yet")
+
+    def _analyze_documents(self, documents: List[ProcessedDocument]) -> List[ConsolidationAnalysisResult]:
+        """Analyze document files and their structure using threading"""
+        def process_document(doc: ProcessedDocument):
+            with ThreadPoolExecutor(max_workers=self.chunk_concurrency) as chunk_executor:
+                chunk_futures = [chunk_executor.submit(self._analyze_chunk, chunk.text, chunk.index) for chunk in doc.chunks]
+                chunk_results = []
+                for cf in tqdm(chunk_futures):
+                    chunk_result = cf.result()
+                    chunk_results.append(chunk_result)
+                return self._consolidate_results(chunk_results)
+
         results = []
-        for table in tqdm(tables, desc="Analyzing database tables"):
-            # Convert table schema and data to processable format
-            table_content = f"""
-            Table Name: {table["name"]}
-            Schema: {json.dumps(table["schema"], indent=2)}
-            Sample Data: {json.dumps(table["sample_data"], indent=2)}
-            """
-            with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-                temp_file.write(table_content)
-                temp_file.flush()
-                result = self._process_document(temp_file.name)
-                if result:
-                    result.source_metadata = table["metadata"]
-                    result.content_type = "database"
-                    results.append(result)
-                os.unlink(temp_file.name)
+        with ThreadPoolExecutor(max_workers=self.doc_concurrency) as executor:
+            futures = [executor.submit(process_document, doc) for doc in documents]
+            with tqdm(total=len(futures), desc="Analyzing documents", unit="docs") as pbar:
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                    pbar.update(1)
+
         return results
-
-    def _process_document(self, document_path) -> Optional[ConsolidationAnalysisResult]:
-        """
-        Process a single long document file.
-        Args:
-            document_path (str): Path to the document file
-        Returns:
-            list[dict]: List of chunk-level intermediate data, each element corresponds to a chunk's analysis result
-        """
-        # Calculate document hash
-        content_hash = self._calculate_file_hash(document_path)
-
-        # Check if document already processed
-        existing_doc = self.document_store.get_document_by_path(document_path)
-        if existing_doc and existing_doc.hash == content_hash:
-            # Document unchanged, return cached analysis
-            latest_analysis = existing_doc.analysis_results[-1]
-            return ConsolidationAnalysisResult(**latest_analysis.analysis_data)
-
-        # Process new document
-        loaded_data = self.loader.process(target_path=document_path)
-        document = self.document_store.store_document(
-            document_path,
-            content_hash,
-            metadata={
-                "filename": Path(document_path).name,
-                "processed_at": datetime.utcnow().isoformat(),
-            },
-        )
-
-        # Store chunks
-        chunks = self.document_store.store_chunks(document.id, loaded_data.raw_data)
-
-        # Process chunks and store analysis
-        analysis_results = []
-        for chunk in chunks:
-            analysis = self._analyze_chunk(chunk.content, chunk.index)
-            if analysis:
-                self.document_store.store_chunk_analysis(
-                    chunk.id, analysis.model_dump()
-                )
-                analysis_results.append(analysis)
-
-        # Consolidate results
-        consolidated = self._consolidate_results(analysis_results)
-        if consolidated:
-            self.document_store.store_analysis(document.id, consolidated.model_dump())
-
-        return consolidated

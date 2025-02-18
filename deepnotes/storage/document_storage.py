@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class Document(Base):
+class DocumentModel(Base):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -31,13 +31,13 @@ class Document(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    chunks: Mapped[List["DocumentChunk"]] = relationship(back_populates="document")
-    analysis_results: Mapped[List["DocumentAnalysis"]] = relationship(
+    chunks: Mapped[List["DocumentChunkModel"]] = relationship(back_populates="document")
+    analysis_results: Mapped[List["DocumentAnalysisModel"]] = relationship(
         back_populates="document"
     )
 
 
-class DocumentChunk(Base):
+class DocumentChunkModel(Base):
     __tablename__ = "document_chunks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -46,13 +46,13 @@ class DocumentChunk(Base):
     content: Mapped[str] = mapped_column(Text)
     meta_info: Mapped[Dict] = mapped_column(JSON)
 
-    document: Mapped[Document] = relationship(back_populates="chunks")
-    analysis_results: Mapped[List["ChunkAnalysis"]] = relationship(
+    document: Mapped[DocumentModel] = relationship(back_populates="chunks")
+    analysis_results: Mapped[List["ChunkAnalysisModel"]] = relationship(
         back_populates="chunk", cascade="all, delete-orphan"
     )
 
 
-class DocumentAnalysis(Base):
+class DocumentAnalysisModel(Base):
     __tablename__ = "document_analyses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -60,10 +60,10 @@ class DocumentAnalysis(Base):
     analysis_data: Mapped[Dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    document: Mapped[Document] = relationship(back_populates="analysis_results")
+    document: Mapped[DocumentModel] = relationship(back_populates="analysis_results")
 
 
-class ChunkAnalysis(Base):
+class ChunkAnalysisModel(Base):
     __tablename__ = "chunk_analyses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -71,7 +71,7 @@ class ChunkAnalysis(Base):
     analysis_data: Mapped[Dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    chunk: Mapped[DocumentChunk] = relationship(back_populates="analysis_results")
+    chunk: Mapped[DocumentChunkModel] = relationship(back_populates="analysis_results")
 
 
 class DocumentStore:
@@ -84,20 +84,21 @@ class DocumentStore:
         self.engine = create_engine(database_url, **engine_args)
         Base.metadata.create_all(self.engine)
 
-    def store_document(self, path: str, content_hash: str, metadata: Dict) -> Document:
+    def store_document(self, path: str, content_hash: str, metadata: Dict) -> int:
         with Session(self.engine) as session:
-            document = Document(
+            document = DocumentModel(
                 path=str(Path(path).absolute()), hash=content_hash, meta_info=metadata
             )
             session.add(document)
             session.commit()
-            return document
+            return document.id
 
-    def store_chunks(self, document_id: int, chunks: List[Dict]) -> List[DocumentChunk]:
+    def store_chunks(self, document_id: int, chunks: List[Dict]) -> List[DocumentChunkModel]:
         with Session(self.engine) as session:
+            document = session.get(DocumentModel, document_id)
             chunk_objects = []
             for idx, chunk in enumerate(chunks):
-                chunk_obj = DocumentChunk(
+                chunk_obj = DocumentChunkModel(
                     document_id=document_id,
                     index=idx,
                     content=chunk["text"],
@@ -108,32 +109,32 @@ class DocumentStore:
             session.commit()
             return chunk_objects
 
-    def store_analysis(self, document_id: int, analysis_data: Dict) -> DocumentAnalysis:
+    def store_analysis(self, document_id: int, analysis_data: Dict) -> DocumentAnalysisModel:
         with Session(self.engine) as session:
-            analysis = DocumentAnalysis(
+            analysis = DocumentAnalysisModel(
                 document_id=document_id, analysis_data=analysis_data
             )
             session.add(analysis)
             session.commit()
             return analysis
 
-    def store_chunk_analysis(self, chunk_id: int, analysis_data: Dict) -> ChunkAnalysis:
+    def store_chunk_analysis(self, chunk_id: int, analysis_data: Dict) -> ChunkAnalysisModel:
         with Session(self.engine) as session:
-            analysis = ChunkAnalysis(chunk_id=chunk_id, analysis_data=analysis_data)
+            analysis = ChunkAnalysisModel(chunk_id=chunk_id, analysis_data=analysis_data)
             session.add(analysis)
             session.commit()
             return analysis
 
-    def get_document(self, document_id: int) -> Optional[Document]:
+    def get_document(self, document_id: int) -> Optional[DocumentModel]:
         with Session(self.engine) as session:
-            return session.get(Document, document_id)
+            return session.get(DocumentModel, document_id)
 
-    def get_document_by_path(self, path: str) -> Optional[Document]:
+    def get_document_by_path(self, path: str) -> Optional[DocumentModel]:
         with Session(self.engine) as session:
-            stmt = select(Document).where(Document.path == str(Path(path).absolute()))
+            stmt = select(DocumentModel).where(DocumentModel.path == str(Path(path).absolute()))
             return session.execute(stmt).scalar_one_or_none()
 
-    def get_chunks(self, document_id: int) -> List[DocumentChunk]:
+    def get_chunks(self, document_id: int) -> List[DocumentChunkModel]:
         with Session(self.engine) as session:
-            stmt = select(DocumentChunk).where(DocumentChunk.document_id == document_id)
+            stmt = select(DocumentChunkModel).where(DocumentChunkModel.document_id == document_id)
             return session.execute(stmt).scalars().all()

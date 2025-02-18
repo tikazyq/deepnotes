@@ -173,10 +173,11 @@ class WebDocumentLoader(BaseLoader):
                 new_urls = []
                 for link in soup.find_all('a', href=True):
                     absolute_url = urljoin(url, link['href'])
-                    if self._is_valid_url(absolute_url):
+                    clean_url = absolute_url.split('#')[0].split('?')[0]
+                    if self._is_valid_url(clean_url):
                         with self.visited_lock:
-                            if absolute_url not in self.visited_urls:
-                                new_urls.append(absolute_url)
+                            if clean_url not in self.visited_urls:
+                                new_urls.append(clean_url)
                 return new_urls
         except Exception as e:
             print(f"Error crawling {url}: {str(e)}")
