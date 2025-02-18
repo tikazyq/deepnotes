@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>DeepNotes.API</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DeepNotes.Core\DeepNotes.Core.csproj" />
+    <ProjectReference Include="..\DeepNotes.Database\DeepNotes.Database.csproj" />
+    <ProjectReference Include="..\DeepNotes.KnowledgeGraph\DeepNotes.KnowledgeGraph.csproj" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+
+</Project> 

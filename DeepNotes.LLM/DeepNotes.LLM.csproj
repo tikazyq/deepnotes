@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DeepNotes.LLM</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DeepNotes.Core\DeepNotes.Core.csproj" />
+  </ItemGroup>
+
+</Project> 

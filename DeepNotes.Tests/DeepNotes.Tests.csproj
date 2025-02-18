@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DeepNotes.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DeepNotes.Core\DeepNotes.Core.csproj" />
+    <ProjectReference Include="..\DeepNotes.DataLoaders\DeepNotes.DataLoaders.csproj" />
+    <ProjectReference Include="..\DeepNotes.Database\DeepNotes.Database.csproj" />
+    <ProjectReference Include="..\DeepNotes.KnowledgeGraph\DeepNotes.KnowledgeGraph.csproj" />
+  </ItemGroup>
+
+</Project> 
