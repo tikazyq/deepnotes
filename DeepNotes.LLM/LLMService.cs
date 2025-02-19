@@ -1,30 +1,19 @@
-using System.ClientModel;
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
+using Azure;
+using DeepNotes.LLM.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using Polly;
-using Polly.Retry;
-using OpenAI;
-using OpenAI.Chat;
-using ChatMessageContent = OpenAI.Chat.ChatMessageContent;
+using OpenAIClient = Azure.AI.OpenAI.OpenAIClient;
 
 namespace DeepNotes.LLM;
-
-public record LLMResponse(
-    string Content,
-    string Provider,
-    string Model,
-    int InputTokens,
-    int OutputTokens
-);
 
 public class LLMConfig
 {
     public string Provider { get; set; } = "openai";
-    public string Model { get; set; } = "gpt-4";
-    public string? BaseUrl { get; set; }
+    public string Model { get; set; } = "gpt-4o";
+
+    public string? Endpoint { get; set; }
     public string? ApiKey { get; set; }
     public string? ApiVersion { get; set; }
     public string Language { get; set; } = "english";
@@ -32,36 +21,43 @@ public class LLMConfig
 
 public class LLMService
 {
-    private readonly AsyncRetryPolicy _retryPolicy;
     private readonly LLMConfig _config;
-    private readonly Kernel _kernel;
+    private readonly IChatCompletionService _service;
 
     public LLMService(LLMConfig config)
     {
         _config = config;
-        _kernel = KernelWrapper.CreateKernel(config);
-
-        _retryPolicy = Policy
-            .Handle<Exception>(ex => ex is HttpRequestException or KernelException)
-            .WaitAndRetryAsync(5, attempt =>
-                TimeSpan.FromSeconds(Math.Pow(1.5, attempt)));
+        _service = CreateChatCompletionService();
     }
 
     public async Task<LLMResponse> GenerateAsync(
-        string prompt,
-        Type? responseModel = null)
+        string prompt)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        var history = PrepareChatHistory(prompt);
+
+        var response = await _service.GetChatMessageContentsAsync(history);
+
+        return ValidateResponse(response);
+    }
+
+    public async Task<StructuredLLMResponse<T>> GenerateStructuredAsync<T>(string prompt)
+    {
+        var history = PrepareChatHistory(prompt);
+
+        var response = await _service.GetChatMessageContentsAsync(history);
+
+        return await ValidateAndWrapResponseAsync<T>(prompt, response);
+    }
+
+    private IChatCompletionService CreateChatCompletionService()
+    {
+        return _config.Provider.ToLower() switch
         {
-            var chat = _kernel.GetRequiredService<IChatCompletionService>();
-            var history = PrepareChatHistory(prompt);
-
-            var result = await chat.GetChatMessageContentAsync(
-                history
-            );
-
-            return ProcessResponse(result, responseModel);
-        });
+            "openai" => new OpenAIChatCompletionService(_config.Model,
+                new OpenAIClient(new Uri(_config.Endpoint ?? string.Empty),
+                    new AzureKeyCredential(_config.ApiKey ?? string.Empty))),
+            _ => throw new NotSupportedException($"Provider {_config.Provider} is not supported.")
+        };
     }
 
     private ChatHistory PrepareChatHistory(string prompt)
@@ -80,84 +76,113 @@ public class LLMService
         };
     }
 
-    private LLMResponse ProcessResponse(
-        ChatMessageContent response,
-        Type? responseModel)
+    private LLMResponse ValidateResponse(IReadOnlyList<ChatMessageContent>? response)
     {
-        var content = response.Content ?? string.Empty;
-
-        if (responseModel != null)
+        if (response == null)
         {
-            try
-            {
-                return ValidateAndWrapResponse(content, responseModel);
-            }
-            catch (JsonException ex)
-            {
-                return HandleValidationError(content, ex, responseModel);
-            }
+            throw new InvalidOperationException("No response from the model.");
         }
 
-        return new LLMResponse(
-            content,
-            _config.Provider,
-            _config.Model,
-            response.Metadata?.Usage?.PromptTokens ?? 0,
-            response.Metadata?.Usage?.CompletionTokens ?? 0
-        );
+        if (response.Count == 0)
+        {
+            throw new InvalidOperationException("Response count is zero.");
+        }
+
+        if (response[0].Content == null)
+        {
+            throw new InvalidOperationException("Response content is null.");
+        }
+
+        return new LLMResponse
+        {
+            Content = response[0].Content!
+        };
     }
 
-    private LLMResponse ValidateAndWrapResponse(
-        string content,
-        Type responseModel)
+    private async Task<StructuredLLMResponse<T>> ValidateAndWrapResponseAsync<T>(string prompt,
+        IReadOnlyList<ChatMessageContent> response)
     {
-        var modelInstance = JsonSerializer.Deserialize(
-            content,
-            responseModel);
+        T? modelInstance;
 
-        return new LLMResponse(
-            content,
-            _config.Provider,
-            _config.Model,
-            0, 0
-        );
+        var llmResponse = ValidateResponse(response);
+
+        try
+        {
+            modelInstance = JsonSerializer.Deserialize<T>(llmResponse.Content);
+        }
+        catch (JsonException error)
+        {
+            return await CorrectAndValidateResponse<T>(prompt, llmResponse.Content, error);
+        }
+
+        if (modelInstance == null)
+        {
+            throw new InvalidOperationException("Failed to deserialize response content.");
+        }
+
+        return new StructuredLLMResponse<T> { Content = llmResponse.Content, ModelInstance = modelInstance };
     }
 
-    private LLMResponse HandleValidationError(
+    private async Task<StructuredLLMResponse<T>> CorrectAndValidateResponse<T>(
+        string originalPrompt,
         string invalidJson,
         JsonException error,
-        Type responseModel)
+        int maxRetries = 3,
+        List<string>? previousErrors = null)
     {
-        // Implement self-correction logic similar to Python version
+        previousErrors ??= [];
+        previousErrors.Add($"Error: {error.Message}\nInvalid JSON: {invalidJson}");
+
+        if (maxRetries <= 0)
+        {
+            throw new InvalidOperationException($"Max retries exceeded. Errors:\n{string.Join("\n", previousErrors)}");
+        }
+
+        var errorHistory = string.Join("\n", previousErrors.Select((e, i) => $"Attempt {i + 1}: {e}"));
+
         var correctionPrompt = $"""
-                                JSON validation failed. Error: {error.Message}
-                                Invalid JSON: {invalidJson}
-                                Please correct the JSON to match the {responseModel.Name} schema.
-                                Respond ONLY with the corrected JSON.
+                                JSON validation failed multiple times. Error history:
+                                {errorHistory}
+
+                                Original prompt: {originalPrompt}
+
+                                Please carefully correct the JSON to match the required schema.
+                                Respond ONLY with the corrected JSON between ```json markers.
                                 """;
 
-        var correctedResponse = GenerateAsync(correctionPrompt).Result;
-        return ValidateAndWrapResponse(correctedResponse.Content, responseModel);
-    }
-}
+        var correctedResponse = await GenerateAsync(correctionPrompt);
+        var correctedContent = ExtractJsonFromMarkdown(correctedResponse.Content);
 
-// Kernel configuration helper
-public static class KernelWrapper
-{
-    public static Kernel CreateKernel(LLMConfig config)
-    {
-        var builder = Kernel.CreateBuilder();
-
-        var options = new OpenAIClientOptions
+        try
         {
-            Endpoint = config.BaseUrl != null ? new Uri(config.BaseUrl) : null
-        };
+            var modelInstance = JsonSerializer.Deserialize<T>(correctedContent) ??
+                                throw new InvalidOperationException("Deserialized null value");
 
-        var client = new ChatClient(config.Model, new ApiKeyCredential(config.ApiKey!), options);
+            return new StructuredLLMResponse<T>
+            {
+                Content = correctedContent,
+                ModelInstance = modelInstance
+            };
+        }
+        catch (JsonException ex)
+        {
+            return await CorrectAndValidateResponse<T>(
+                originalPrompt,
+                correctedContent,
+                ex,
+                maxRetries - 1,
+                previousErrors
+            );
+        }
+    }
 
-        builder.Services.AddSingleton<IChatCompletionService>(
-            new OpenAIChatCompletionService(config.Model, client));
+    private string ExtractJsonFromMarkdown(string markdownText)
+    {
+        var jsonStart = markdownText.IndexOf("```json", StringComparison.Ordinal);
+        if (jsonStart == -1) return markdownText;
 
-        return builder.Build();
+        jsonStart += 7; // Skip ```json\n
+        var jsonEnd = markdownText.LastIndexOf("```", StringComparison.Ordinal);
+        return jsonEnd > jsonStart ? markdownText[jsonStart..jsonEnd].Trim() : markdownText;
     }
 }
