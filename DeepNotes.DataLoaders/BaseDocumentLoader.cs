@@ -1,7 +1,7 @@
 namespace DeepNotes.DataLoaders;
 
+using DeepNotes.Core.Models.Document;
 using DeepNotes.Core.Interfaces;
-using DeepNotes.Core.Models;
 
 public abstract class BaseDocumentLoader : IDocumentLoader
 {
@@ -26,4 +26,4 @@ public abstract class BaseDocumentLoader : IDocumentLoader
             Metadata = ExtractMetadata(content)
         };
     }
-} 
+}

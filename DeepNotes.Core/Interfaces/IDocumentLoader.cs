@@ -1,4 +1,5 @@
 using DeepNotes.Core.Models;
+using DeepNotes.Core.Models.Document;
 
 namespace DeepNotes.Core.Interfaces;
 

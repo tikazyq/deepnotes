@@ -1,3 +1,5 @@
+using DeepNotes.Core.Models.Document;
+
 namespace DeepNotes.Database.SqlServer;
 
 using Microsoft.EntityFrameworkCore;

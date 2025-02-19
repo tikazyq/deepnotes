@@ -24,30 +24,48 @@ public class PdfFileHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task ExtractTextAsync_ValidPdf_ReturnsContent()
+    public async Task LoadDocumentAsync_ValidPdf_ExtractsContent()
     {
         // Arrange
         var handler = new PdfFileHandler();
 
         // Act
-        var content = await handler.ExtractTextAsync(_testFilePath);
+        var document = await handler.LoadDocumentAsync(_testFilePath);
 
         // Assert
-        Assert.Contains("Test PDF content", content);
+        Assert.NotNull(document);
+        Assert.Contains("Test PDF content", document.Content);
+        Assert.Equal(_testFilePath, document.Source);
+        Assert.Equal("File", document.SourceType);
     }
 
     [Fact]
-    public void ExtractMetadata_ValidPdf_ReturnsMetadata()
+    public async Task LoadDocumentAsync_WithMetadata_ExtractsMetadata()
     {
         // Arrange
         var handler = new PdfFileHandler();
 
         // Act
-        var metadata = handler.ExtractMetadata(_testFilePath);
+        var document = await handler.LoadDocumentAsync(_testFilePath);
 
         // Assert
-        Assert.Equal("1", metadata["PageCount"]);
-        Assert.NotNull(metadata["PdfVersion"]);
+        Assert.NotNull(document.Metadata);
+        Assert.Contains("PageCount", document.Metadata.Keys);
+        Assert.Equal("1", document.Metadata["PageCount"]);
+    }
+
+    [Theory]
+    [InlineData(".pdf")]
+    public void CanHandle_SupportedExtensions_ReturnsTrue(string extension)
+    {
+        // Arrange
+        var handler = new PdfFileHandler();
+
+        // Act
+        var result = handler.CanHandle(extension);
+
+        // Assert
+        Assert.True(result);
     }
 
     private void CreateTestPdf(string filePath, string content)

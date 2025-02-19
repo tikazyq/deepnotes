@@ -1,32 +1,39 @@
 using System.Text;
-
-namespace DeepNotes.DataLoaders.FileHandlers;
-
+using DeepNotes.DataLoaders.Utils;
+using DeepNotes.Core.Models.Document;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Presentation;
 
+namespace DeepNotes.DataLoaders.FileHandlers;
+
 public class PowerPointFileHandler : OfficeFileHandlerBase
 {
+    private readonly TextChunker _chunker;
+
     protected override string[] SupportedExtensions => new[] { ".pptx" };
+
+    public PowerPointFileHandler(TextChunker? chunker = null)
+    {
+        _chunker = chunker ?? new TextChunker();
+    }
 
     protected override OpenXmlPackage OpenDocument(string filePath)
     {
         return PresentationDocument.Open(filePath, false);
     }
 
-    public override async Task<string> ExtractTextAsync(string filePath)
+    public override async Task<Document> LoadDocumentAsync(string filePath)
     {
         using var doc = PresentationDocument.Open(filePath, false);
         var presentationPart = doc.PresentationPart;
-        if (presentationPart == null) return string.Empty;
-
         var text = new StringBuilder();
-        var slideIds = presentationPart.Presentation.SlideIdList;
-        
-        if (slideIds != null)
+        var metadata = ExtractBaseMetadata(doc);
+
+        if (presentationPart?.Presentation.SlideIdList != null)
         {
             int slideNumber = 1;
-            foreach (var slideId in slideIds.ChildElements.OfType<SlideId>())
+            var slideCount = 0;
+            foreach (var slideId in presentationPart.Presentation.SlideIdList.ChildElements.OfType<SlideId>())
             {
                 var slidePart = (SlidePart)presentationPart.GetPartById(slideId.RelationshipId!);
                 text.AppendLine($"Slide {slideNumber}");
@@ -37,26 +44,23 @@ public class PowerPointFileHandler : OfficeFileHandlerBase
                 {
                     text.AppendLine(paragraph.InnerText);
                 }
+
                 text.AppendLine();
                 slideNumber++;
+                slideCount++;
             }
+
+            metadata["SlideCount"] = slideCount.ToString();
         }
 
-        return await Task.FromResult(text.ToString());
-    }
-
-    public override Dictionary<string, string> ExtractMetadata(string filePath)
-    {
-        var metadata = base.ExtractMetadata(filePath);
-        
-        using var doc = PresentationDocument.Open(filePath, false);
-        var presentationPart = doc.PresentationPart;
-        if (presentationPart?.Presentation.SlideIdList != null)
+        var document = new Document
         {
-            metadata["SlideCount"] = presentationPart.Presentation.SlideIdList
-                .ChildElements.Count.ToString();
-        }
+            Content = text.ToString(),
+            Source = filePath,
+            SourceType = "File",
+            Metadata = metadata
+        };
 
-        return metadata;
+        return await Task.FromResult(document);
     }
-} 
+}

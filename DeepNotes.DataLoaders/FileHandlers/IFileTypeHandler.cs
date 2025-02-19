@@ -1,8 +1,11 @@
+using DeepNotes.Core.Models.Document;
+using DeepNotes.DataLoaders.Utils;
+
 namespace DeepNotes.DataLoaders.FileHandlers;
 
 public interface IFileTypeHandler
 {
     bool CanHandle(string fileExtension);
-    Task<string> ExtractTextAsync(string filePath);
-    Dictionary<string, string> ExtractMetadata(string filePath);
+    Task<Document> LoadDocumentAsync(string filePath);
+    TextChunker GetChunker();
 } 

@@ -2,19 +2,35 @@ using System.Text;
 
 namespace DeepNotes.DataLoaders.FileHandlers;
 
+using DeepNotes.Core.Models.Document;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
+using DeepNotes.DataLoaders.Utils;
 
 public class PdfFileHandler : IFileTypeHandler
 {
+    private readonly TextChunker _chunker;
+
+    public PdfFileHandler(TextChunker? chunker = null)
+    {
+        _chunker = chunker ?? new TextChunker();
+    }
+
+    public TextChunker GetChunker()
+    {
+        return _chunker;
+    }
+
     public bool CanHandle(string fileExtension)
     {
         return fileExtension.ToLower() == ".pdf";
     }
 
-    public async Task<string> ExtractTextAsync(string filePath)
+    public async Task<Document> LoadDocumentAsync(string filePath)
     {
+        var chunker = GetChunker();
+
         using var pdfReader = new PdfReader(filePath);
         using var pdfDocument = new PdfDocument(pdfReader);
         var text = new StringBuilder();
@@ -27,13 +43,28 @@ public class PdfFileHandler : IFileTypeHandler
             text.AppendLine(currentText);
         }
 
-        return await Task.FromResult(text.ToString());
+        var content = text.ToString();
+        var chunks = chunker.CreateChunks(content);
+
+        var document = new Document
+        {
+            Content = content,
+            Source = filePath,
+            SourceType = "File",
+            Metadata = ExtractMetadata(pdfDocument),
+            Chunks = chunks
+        };
+
+        foreach (var item in chunker.GetChunkingMetadata(chunks.Count))
+        {
+            document.Metadata[item.Key] = item.Value;
+        }
+
+        return document;
     }
 
-    public Dictionary<string, string> ExtractMetadata(string filePath)
+    private Dictionary<string, string> ExtractMetadata(PdfDocument pdfDocument)
     {
-        using var pdfReader = new PdfReader(filePath);
-        using var pdfDocument = new PdfDocument(pdfReader);
         var metadata = new Dictionary<string, string>
         {
             ["PageCount"] = pdfDocument.GetNumberOfPages().ToString(),
@@ -51,4 +82,4 @@ public class PdfFileHandler : IFileTypeHandler
 
         return metadata;
     }
-} 
+}

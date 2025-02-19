@@ -1,8 +1,7 @@
 namespace DeepNotes.Tests.DocumentLoaders;
 
-using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Spreadsheet;
 using DeepNotes.DataLoaders.FileHandlers;
+using ClosedXML.Excel;
 using Xunit;
 
 public class ExcelFileHandlerTests : IDisposable
@@ -12,7 +11,7 @@ public class ExcelFileHandlerTests : IDisposable
     public ExcelFileHandlerTests()
     {
         _testFilePath = Path.GetTempFileName() + ".xlsx";
-        CreateTestSpreadsheet(_testFilePath);
+        CreateTestWorkbook(_testFilePath);
     }
 
     public void Dispose()
@@ -24,54 +23,80 @@ public class ExcelFileHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task ExtractTextAsync_ValidExcel_ReturnsContent()
+    public async Task LoadDocumentAsync_ValidExcel_ExtractsContent()
     {
         // Arrange
         var handler = new ExcelFileHandler();
 
         // Act
-        var content = await handler.ExtractTextAsync(_testFilePath);
+        var document = await handler.LoadDocumentAsync(_testFilePath);
 
         // Assert
-        Assert.Contains("Test Cell Content", content);
-        Assert.Contains("Sheet: Sheet1", content);
+        Assert.NotNull(document);
+        Assert.Contains("Test Content", document.Content);
+        Assert.Equal(_testFilePath, document.Source);
+        Assert.Equal("File", document.SourceType);
     }
 
     [Fact]
-    public void ExtractMetadata_ValidExcel_ReturnsMetadata()
+    public async Task LoadDocumentAsync_WithMultipleSheets_ExtractsAllContent()
+    {
+        // Arrange
+        var handler = new ExcelFileHandler();
+        var data = new[]
+        {
+            new[] { "Header1", "Header2" },
+            new[] { "Value1", "Value2" },
+            new[] { "Value3", "Value4" }
+        };
+        CreateSpreadsheetWithData(_testFilePath, data);
+
+        // Act
+        var document = await handler.LoadDocumentAsync(_testFilePath);
+
+        // Assert
+        Assert.NotNull(document);
+        Assert.Contains("Header1", document.Content);
+        Assert.Contains("Value4", document.Content);
+        Assert.Contains("Sheet1", document.Metadata["SheetNames"]);
+    }
+
+    [Theory]
+    [InlineData(".xlsx")]
+    [InlineData(".xls")]
+    public void CanHandle_SupportedExtensions_ReturnsTrue(string extension)
     {
         // Arrange
         var handler = new ExcelFileHandler();
 
         // Act
-        var metadata = handler.ExtractMetadata(_testFilePath);
+        var result = handler.CanHandle(extension);
 
         // Assert
-        Assert.Equal("1", metadata["SheetCount"]);
+        Assert.True(result);
     }
 
-    private void CreateTestSpreadsheet(string filePath)
+    private void CreateTestWorkbook(string filePath)
     {
-        using var spreadsheet = SpreadsheetDocument.Create(filePath, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook);
-        var workbookPart = spreadsheet.AddWorkbookPart();
-        workbookPart.Workbook = new Workbook();
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Sheet1");
+        worksheet.Cell("A1").Value = "Test Content";
+        workbook.SaveAs(filePath);
+    }
 
-        var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-        worksheetPart.Worksheet = new Worksheet(new SheetData());
-
-        var sheets = spreadsheet.WorkbookPart!.Workbook.AppendChild(new Sheets());
-        var sheet = new Sheet() 
-        { 
-            Id = spreadsheet.WorkbookPart.GetIdOfPart(worksheetPart),
-            SheetId = 1,
-            Name = "Sheet1"
-        };
-        sheets.AppendChild(sheet);
-
-        var sheetData = worksheetPart.Worksheet.GetFirstChild<SheetData>();
-        var row = new Row();
-        var cell = new Cell() { DataType = CellValues.String, CellValue = new CellValue("Test Cell Content") };
-        row.AppendChild(cell);
-        sheetData!.AppendChild(row);
+    private void CreateSpreadsheetWithData(string filePath, string[][] data)
+    {
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Sheet1");
+        
+        for (int row = 0; row < data.Length; row++)
+        {
+            for (int col = 0; col < data[row].Length; col++)
+            {
+                worksheet.Cell(row + 1, col + 1).Value = data[row][col];
+            }
+        }
+        
+        workbook.SaveAs(filePath);
     }
 } 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DeepNotes.Core.Models;
+using DeepNotes.Core.Models.Document;
 using Microsoft.EntityFrameworkCore;
 
 namespace DeepNotes.Database.SqlServer;

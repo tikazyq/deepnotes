@@ -1,3 +1,5 @@
+using DeepNotes.Core.Models.Document;
+
 namespace DeepNotes.API.Controllers;
 
 using Microsoft.AspNetCore.Mvc;

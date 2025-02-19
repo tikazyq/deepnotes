@@ -1,4 +1,4 @@
-namespace DeepNotes.Core.Models;
+namespace DeepNotes.Core.Models.Document;
 
 public class DocumentMetadata
 {
