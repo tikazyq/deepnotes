@@ -24,10 +24,10 @@ public class LLMService
     private readonly LLMConfig _config;
     private readonly IChatCompletionService _service;
 
-    public LLMService(LLMConfig config)
+    public LLMService(LLMConfig config, IChatCompletionService? service = null)
     {
         _config = config;
-        _service = CreateChatCompletionService();
+        _service = service ?? CreateChatCompletionService();
     }
 
     public async Task<LLMResponse> GenerateAsync(
@@ -88,7 +88,7 @@ public class LLMService
             throw new InvalidOperationException("Response count is zero.");
         }
 
-        if (response[0].Content == null)
+        if (string.IsNullOrEmpty(response[0].Content))
         {
             throw new InvalidOperationException("Response content is null.");
         }

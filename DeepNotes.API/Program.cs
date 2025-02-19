@@ -26,7 +26,7 @@ builder.Services.AddSingleton<LLMService>(sp =>
     {
         Provider = builder.Configuration["LLM:Provider"],
         Model = builder.Configuration["LLM:Model"],
-        BaseUrl = builder.Configuration["LLM:BaseUrl"],
+        Endpoint = builder.Configuration["LLM:Endpoint"],
         ApiKey = builder.Configuration["LLM:ApiKey"],
         ApiVersion = builder.Configuration["LLM:ApiVersion"],
         Language = builder.Configuration["LLM:Language"] ?? "english"

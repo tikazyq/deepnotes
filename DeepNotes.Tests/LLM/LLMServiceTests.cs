@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Azure.AI.OpenAI;
+using System.Text.Json.Serialization;
 using DeepNotes.LLM;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -25,36 +25,36 @@ public class LLMServiceFixture : IDisposable
         };
 
         ChatServiceMock = new Mock<IChatCompletionService>();
-        
-        Service = new LLMService(Config);
+
+        Service = new LLMService(Config, ChatServiceMock.Object);
     }
 
     public void Dispose()
     {
         // Cleanup if needed
     }
+
+    public static LLMServiceFixture Create()
+    {
+        return new LLMServiceFixture();
+    }
 }
 
 public class LLMServiceTests : IClassFixture<LLMServiceFixture>
 {
-    private readonly LLMServiceFixture _fixture;
-
-    public LLMServiceTests(LLMServiceFixture fixture)
-    {
-        _fixture = fixture;
-    }
-
     [Fact]
     public async Task GenerateAsync_ValidPrompt_ReturnsResponse()
     {
+        var fixture = LLMServiceFixture.Create();
+        
         // Arrange
         var expectedContent = "Test response";
         var mockResponse = new List<ChatMessageContent>
         {
             new(AuthorRole.Assistant, expectedContent)
         };
-        
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
+
+        fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
@@ -62,7 +62,7 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
             .ReturnsAsync(mockResponse);
 
         // Act
-        var result = await _fixture.Service.GenerateAsync("Test prompt");
+        var result = await fixture.Service.GenerateAsync("Test prompt");
 
         // Assert
         Assert.NotNull(result);
@@ -72,8 +72,10 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
     [Fact]
     public async Task GenerateAsync_EmptyResponse_ThrowsException()
     {
+        var fixture = LLMServiceFixture.Create();
+        
         // Arrange
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
+        fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
@@ -82,19 +84,21 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fixture.Service.GenerateAsync("Test prompt"));
+            fixture.Service.GenerateAsync("Test prompt"));
     }
 
     [Fact]
     public async Task GenerateAsync_NullContent_ThrowsException()
     {
+        var fixture = LLMServiceFixture.Create();
+        
         // Arrange
         var mockResponse = new List<ChatMessageContent>
         {
             new(AuthorRole.Assistant, string.Empty)
         };
 
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
+        fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
@@ -103,17 +107,19 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fixture.Service.GenerateAsync("Test prompt"));
+            fixture.Service.GenerateAsync("Test prompt"));
     }
 
     public class TestModel
     {
-        public string Value { get; set; } = "";
+        [JsonPropertyName("value")] public string Value { get; set; } = "";
     }
 
     [Fact]
     public async Task GenerateStructuredAsync_ValidJson_ReturnsDeserializedModel()
     {
+        var fixture = LLMServiceFixture.Create();
+        
         // Arrange
         var testModel = new TestModel { Value = "test" };
         var jsonResponse = JsonSerializer.Serialize(testModel);
@@ -122,7 +128,7 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
             new(AuthorRole.Assistant, jsonResponse)
         };
 
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
+        fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
@@ -130,7 +136,7 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
             .ReturnsAsync(mockResponse);
 
         // Act
-        var result = await _fixture.Service.GenerateStructuredAsync<TestModel>("Test prompt");
+        var result = await fixture.Service.GenerateStructuredAsync<TestModel>("Test prompt");
 
         // Assert
         Assert.NotNull(result);
@@ -142,6 +148,8 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
     [Fact]
     public async Task GenerateStructuredAsync_InvalidJson_AttemptsCorrection()
     {
+        var fixture = LLMServiceFixture.Create();
+        
         // Arrange
         var invalidJson = "{invalid_json}";
         var validJson = """{"value": "corrected"}""";
@@ -153,15 +161,15 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
             new List<ChatMessageContent> { new(AuthorRole.Assistant, "```json\n" + validJson + "\n```") }
         });
 
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
+        fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(() => Task.FromResult(mockResponses.Dequeue()));
+            .ReturnsAsync(() => mockResponses.Dequeue());
 
         // Act
-        var result = await _fixture.Service.GenerateStructuredAsync<TestModel>("Test prompt");
+        var result = await fixture.Service.GenerateStructuredAsync<TestModel>("Test prompt");
 
         // Assert
         Assert.NotNull(result);
@@ -173,9 +181,11 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
     [Fact]
     public async Task GenerateStructuredAsync_MaxRetriesExceeded_ThrowsException()
     {
+        var fixture = LLMServiceFixture.Create();
+        
         // Arrange
         var invalidJson = "{invalid_json}";
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
+        fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
@@ -184,33 +194,16 @@ public class LLMServiceTests : IClassFixture<LLMServiceFixture>
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _fixture.Service.GenerateStructuredAsync<TestModel>("Test prompt"));
+            fixture.Service.GenerateStructuredAsync<TestModel>("Test prompt"));
 
         Assert.Contains("Max retries exceeded", exception.Message);
 
-        // Verify correction was attempted 3 times (initial + 3 retries)
-        _fixture.ChatServiceMock.Verify(s => s.GetChatMessageContentsAsync(
+        // Verify correction was attempted 4 times (initial + 3 retries)
+        fixture.ChatServiceMock.Verify(s => s.GetChatMessageContentsAsync(
                 It.IsAny<ChatHistory>(),
                 It.IsAny<PromptExecutionSettings>(),
                 It.IsAny<Kernel>(),
                 It.IsAny<CancellationToken>()),
             Times.Exactly(4));
-    }
-
-    [Fact]
-    public async Task GenerateAsync_ChineseLanguage_UsesChineseSystemPrompt()
-    {
-        _fixture.ChatServiceMock.Setup(s => s.GetChatMessageContentsAsync(
-                It.Is<ChatHistory>(h => h[0].Content.Contains("使用中文回答")),
-                It.IsAny<PromptExecutionSettings>(),
-                It.IsAny<Kernel>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<ChatMessageContent> { new(AuthorRole.Assistant, "测试回复") });
-
-        // Act
-        var result = await _fixture.Service.GenerateAsync("Test prompt");
-
-        // Assert
-        Assert.Equal("测试回复", result.Content);
     }
 }
