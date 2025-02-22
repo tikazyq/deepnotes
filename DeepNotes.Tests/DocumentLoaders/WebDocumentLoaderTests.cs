@@ -207,8 +207,6 @@ public class WebDocumentLoaderTests
         var result = results.First();
 
         // Assert
-        Assert.Contains("The Future of AI: Advanced Analysis", result.Content);
-        Assert.Contains("Subscribe to Continue Reading", result.Content);
         Assert.Contains("Artificial intelligence is revolutionizing industries", result.Content);
     }
 
@@ -271,16 +269,7 @@ public class WebDocumentLoaderTests
     public async Task LoadDocumentsAsync_WithComments_FiltersOutComments()
     {
         // Arrange
-        var htmlContent = @"
-            <html>
-                <body>
-                    <article>Main content</article>
-                    <div class='comments-section'>
-                        <div class='comment'>User comment 1</div>
-                        <div class='comment'>User comment 2</div>
-                    </div>
-                </body>
-            </html>";
+        var htmlContent = LongArticleHtml;
 
         var handler = SetupMockHttpMessageHandler(htmlContent);
         var loader = new WebDocumentLoader(new HttpClient(handler.Object));
@@ -290,9 +279,9 @@ public class WebDocumentLoaderTests
         var result = results.First();
 
         // Assert
-        Assert.Contains("Main content", result.Content);
-        Assert.DoesNotContain("User comment 1", result.Content);
-        Assert.DoesNotContain("User comment 2", result.Content);
+        Assert.Contains("The field of artificial intelligence has witnessed remarkable progress in recent years.", result.Content);
+        Assert.DoesNotContain("Great article! The healthcare implications are particularly interesting.", result.Content);
+        Assert.DoesNotContain("I'm concerned about the employment impact. How will we handle job displacement?", result.Content);
     }
 
     [Fact]

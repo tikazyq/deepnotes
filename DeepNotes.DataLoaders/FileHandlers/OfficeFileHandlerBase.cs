@@ -1,27 +1,12 @@
-using DeepNotes.DataLoaders.Utils;
-
-namespace DeepNotes.DataLoaders.FileHandlers;
-
 using DeepNotes.Core.Models.Document;
 using DocumentFormat.OpenXml.Packaging;
 
+namespace DeepNotes.DataLoaders.FileHandlers;
+
 public abstract class OfficeFileHandlerBase : IFileTypeHandler
 {
-    private readonly TextChunker _chunker;
-    
-    
-    protected OfficeFileHandlerBase(TextChunker? chunker = null)
-    {
-        _chunker = chunker ?? new TextChunker();
-    }
-
     protected abstract string[] SupportedExtensions { get; }
-   
-    public TextChunker GetChunker()
-    {
-        return _chunker;
-    } 
-    
+
     public bool CanHandle(string fileExtension)
     {
         return SupportedExtensions.Contains(fileExtension.ToLower());
@@ -41,4 +26,4 @@ public abstract class OfficeFileHandlerBase : IFileTypeHandler
     }
 
     protected abstract OpenXmlPackage OpenDocument(string filePath);
-} 
+}

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DeepNotes.Core.Models.Document;
 using DeepNotes.DataLoaders.FileHandlers;
 using DeepNotes.DataLoaders.Utils;
@@ -7,31 +8,48 @@ namespace DeepNotes.DataLoaders;
 public class FileDocumentLoader : BaseDocumentLoader
 {
     private readonly IEnumerable<IFileTypeHandler> _handlers;
-    private readonly TextChunker _chunker;
 
-    public FileDocumentLoader(IEnumerable<IFileTypeHandler>? handlers = null, TextChunker? chunker = null)
+    public FileDocumentLoader(IEnumerable<IFileTypeHandler>? handlers = null)
     {
-        _chunker = chunker ?? new TextChunker();
-        _handlers = handlers ?? new IFileTypeHandler[]
-        {
-            new TextFileHandler(_chunker),
-            new PdfFileHandler(_chunker),
-            new WordFileHandler(_chunker),
-            new ExcelFileHandler(_chunker),
-            new PowerPointFileHandler(_chunker)
-        };
+        _handlers = handlers ??
+        [
+            new PdfFileHandler(),
+            new WordFileHandler(),
+            new ExcelFileHandler(),
+            new PowerPointFileHandler(),
+            new TextFileHandler()
+        ];
     }
 
     public override string SourceType => "File";
 
+    [Experimental("SKEXP0050")]
     public override async Task<IEnumerable<Document>> LoadDocumentsAsync(string sourceIdentifier)
     {
-        if (!File.Exists(sourceIdentifier))
+        if (File.Exists(sourceIdentifier))
         {
-            throw new FileNotFoundException($"File not found: {sourceIdentifier}");
+            var document = await LoadSingleDocumentAsync(sourceIdentifier);
+            return [document];
+        }
+        
+        if (Directory.Exists(sourceIdentifier))
+        {
+            // TODO: implement directory processing
+            throw new NotImplementedException();
         }
 
-        var extension = Path.GetExtension(sourceIdentifier);
+        throw new FileNotFoundException();
+    }
+
+    [Experimental("SKEXP0050")]
+    public async Task<Document> LoadSingleDocumentAsync(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException($"File not found: {filePath}");
+        }
+
+        var extension = Path.GetExtension(filePath);
         var handler = _handlers.FirstOrDefault(h => h.CanHandle(extension));
 
         if (handler == null)
@@ -39,15 +57,15 @@ public class FileDocumentLoader : BaseDocumentLoader
             throw new NotSupportedException($"No handler found for file type: {extension}");
         }
 
-        var document = await handler.LoadDocumentAsync(sourceIdentifier);
+        var document = await handler.LoadDocumentAsync(filePath);
 
         // Add basic file metadata if not already present
         if (!document.Metadata.ContainsKey("FileExtension"))
             document.Metadata["FileExtension"] = extension;
         if (!document.Metadata.ContainsKey("FileName"))
-            document.Metadata["FileName"] = Path.GetFileName(sourceIdentifier);
+            document.Metadata["FileName"] = Path.GetFileName(filePath);
         if (!document.Metadata.ContainsKey("FileSize"))
-            document.Metadata["FileSize"] = new FileInfo(sourceIdentifier).Length.ToString();
+            document.Metadata["FileSize"] = new FileInfo(filePath).Length.ToString();
 
         // Add content-based metadata
         var contentMetadata = ExtractMetadata(document.Content);
@@ -56,8 +74,11 @@ public class FileDocumentLoader : BaseDocumentLoader
             if (!document.Metadata.ContainsKey(key))
                 document.Metadata[key] = value;
         }
+        
+        // Split document content into chunks
+        DocumentChunker.SplitDocumentContentToChunks(document);
 
-        return new[] { document };
+        return document;
     }
 
     protected override Dictionary<string, string> ExtractMetadata(string content)

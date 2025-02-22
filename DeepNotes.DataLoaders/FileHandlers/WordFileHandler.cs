@@ -7,14 +7,7 @@ namespace DeepNotes.DataLoaders.FileHandlers;
 
 public class WordFileHandler : OfficeFileHandlerBase
 {
-    private readonly TextChunker _chunker;
-    
-    protected override string[] SupportedExtensions => new[] { ".docx" };
-    
-    public WordFileHandler(TextChunker? chunker = null)
-    {
-        _chunker = chunker ?? new TextChunker();
-    }
+    protected override string[] SupportedExtensions => new[] { ".docx", ".doc" };
 
     protected override OpenXmlPackage OpenDocument(string filePath)
     {
@@ -23,8 +16,6 @@ public class WordFileHandler : OfficeFileHandlerBase
 
     public override async Task<Core.Models.Document.Document> LoadDocumentAsync(string filePath)
     {
-        var chunker = GetChunker();
-        
         using var doc = WordprocessingDocument.Open(filePath, false);
         var body = doc.MainDocumentPart?.Document.Body;
 
@@ -38,18 +29,11 @@ public class WordFileHandler : OfficeFileHandlerBase
         }
 
         var content = text.ToString();
-        var chunks = chunker.CreateChunks(content);
         var metadata = ExtractBaseMetadata(doc);
 
         if (body != null)
         {
             metadata["ParagraphCount"] = body.Elements<Paragraph>().Count().ToString();
-        }
-
-        // Add chunking metadata
-        foreach (var item in chunker.GetChunkingMetadata(chunks.Count))
-        {
-            metadata[item.Key] = item.Value;
         }
 
         var document = new Core.Models.Document.Document
@@ -58,7 +42,6 @@ public class WordFileHandler : OfficeFileHandlerBase
             Source = filePath,
             SourceType = "File",
             Metadata = metadata,
-            Chunks = chunks
         };
 
         return document;

@@ -1,7 +1,7 @@
-namespace DeepNotes.DataLoaders;
-
 using DeepNotes.Core.Models.Document;
 using DeepNotes.Core.Interfaces;
+
+namespace DeepNotes.DataLoaders;
 
 public abstract class BaseDocumentLoader : IDocumentLoader
 {

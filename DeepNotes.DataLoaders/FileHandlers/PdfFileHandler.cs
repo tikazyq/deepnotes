@@ -10,18 +10,6 @@ using DeepNotes.DataLoaders.Utils;
 
 public class PdfFileHandler : IFileTypeHandler
 {
-    private readonly TextChunker _chunker;
-
-    public PdfFileHandler(TextChunker? chunker = null)
-    {
-        _chunker = chunker ?? new TextChunker();
-    }
-
-    public TextChunker GetChunker()
-    {
-        return _chunker;
-    }
-
     public bool CanHandle(string fileExtension)
     {
         return fileExtension.ToLower() == ".pdf";
@@ -29,8 +17,6 @@ public class PdfFileHandler : IFileTypeHandler
 
     public async Task<Document> LoadDocumentAsync(string filePath)
     {
-        var chunker = GetChunker();
-
         using var pdfReader = new PdfReader(filePath);
         using var pdfDocument = new PdfDocument(pdfReader);
         var text = new StringBuilder();
@@ -41,10 +27,10 @@ public class PdfFileHandler : IFileTypeHandler
             var strategy = new LocationTextExtractionStrategy();
             var currentText = PdfTextExtractor.GetTextFromPage(page, strategy);
             text.AppendLine(currentText);
+            text.AppendLine();
         }
 
         var content = text.ToString();
-        var chunks = chunker.CreateChunks(content);
 
         var document = new Document
         {
@@ -52,13 +38,7 @@ public class PdfFileHandler : IFileTypeHandler
             Source = filePath,
             SourceType = "File",
             Metadata = ExtractMetadata(pdfDocument),
-            Chunks = chunks
         };
-
-        foreach (var item in chunker.GetChunkingMetadata(chunks.Count))
-        {
-            document.Metadata[item.Key] = item.Value;
-        }
 
         return document;
     }

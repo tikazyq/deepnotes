@@ -16,7 +16,6 @@ namespace DeepNotes.DataLoaders;
 public class WebDocumentLoader : BaseDocumentLoader
 {
     private readonly HttpClient _httpClient;
-    private readonly TextChunker _chunker;
     private readonly ConcurrentHashSet<string> _visitedUrls;
     private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     private readonly SemaphoreSlim _visitedLock;
@@ -30,14 +29,12 @@ public class WebDocumentLoader : BaseDocumentLoader
 
     public WebDocumentLoader(
         HttpClient? httpClient = null,
-        TextChunker? chunker = null,
         int timeout = 10,
         int concurrency = 10,
         int retries = 3,
         double backoffFactor = 1.0)
     {
         _httpClient = httpClient ?? new HttpClient();
-        _chunker = chunker ?? new TextChunker();
         _visitedUrls = new ConcurrentHashSet<string>();
         _visitedLock = new SemaphoreSlim(1, 1);
         _timeout = timeout;
@@ -332,7 +329,6 @@ public class WebDocumentLoader : BaseDocumentLoader
                     var content = await ExtractMainContent(html, url);
                     if (!string.IsNullOrWhiteSpace(content))
                     {
-                        var chunks = _chunker.CreateChunks(content);
                         var metadata = ExtractMetadata(html);
                         metadata["ContentType"] = response.Content.Headers.ContentType?.ToString() ?? "";
                         metadata["LastModified"] = response.Content.Headers.LastModified?.ToString() ?? "";
@@ -344,7 +340,6 @@ public class WebDocumentLoader : BaseDocumentLoader
                             Source = url,
                             SourceType = SourceType,
                             Metadata = metadata,
-                            Chunks = chunks
                         };
                     }
                 }

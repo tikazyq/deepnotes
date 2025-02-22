@@ -8,14 +8,7 @@ namespace DeepNotes.DataLoaders.FileHandlers;
 
 public class PowerPointFileHandler : OfficeFileHandlerBase
 {
-    private readonly TextChunker _chunker;
-
-    protected override string[] SupportedExtensions => new[] { ".pptx" };
-
-    public PowerPointFileHandler(TextChunker? chunker = null)
-    {
-        _chunker = chunker ?? new TextChunker();
-    }
+    protected override string[] SupportedExtensions => new[] { ".pptx", ".ppt" };
 
     protected override OpenXmlPackage OpenDocument(string filePath)
     {

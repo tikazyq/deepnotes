@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DeepNotes.DataLoaders.FileHandlers;
 using DeepNotes.DataLoaders.Utils;
 using Xunit;
@@ -7,13 +8,14 @@ namespace DeepNotes.Tests.DocumentLoaders;
 public class TextFileHandlerTests
 {
     [Fact]
+    [Experimental("SKEXP0055")]
     public async Task LoadDocumentAsync_ValidTextFile_LoadsContent()
     {
         // Arrange
         var handler = new TextFileHandler();
         var testFilePath = Path.GetTempFileName();
         var testContent = "Test content\nLine 2\nLine 3";
-        File.WriteAllText(testFilePath, testContent);
+        await File.WriteAllTextAsync(testFilePath, testContent);
 
         try
         {
@@ -67,4 +69,4 @@ public class TextFileHandlerTests
         // Assert
         Assert.False(result);
     }
-} 
+}

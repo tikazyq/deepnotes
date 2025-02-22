@@ -8,14 +8,7 @@ namespace DeepNotes.DataLoaders.FileHandlers;
 
 public class ExcelFileHandler : OfficeFileHandlerBase
 {
-    private readonly TextChunker _chunker;
-
     protected override string[] SupportedExtensions => new[] { ".xlsx" };
-
-    public ExcelFileHandler(TextChunker? chunker = null)
-    {
-        _chunker = chunker ?? new TextChunker();
-    }
 
     protected override OpenXmlPackage OpenDocument(string filePath)
     {
@@ -24,8 +17,6 @@ public class ExcelFileHandler : OfficeFileHandlerBase
 
     public override async Task<Document> LoadDocumentAsync(string filePath)
     {
-        var chunker = GetChunker();
-
         using var doc = SpreadsheetDocument.Open(filePath, false);
         var workbookPart = doc.WorkbookPart;
         var text = new StringBuilder();
@@ -47,7 +38,7 @@ public class ExcelFileHandler : OfficeFileHandlerBase
                 var cells = worksheetPart.Worksheet.Descendants<Cell>();
                 foreach (var cell in cells)
                 {
-                    string value = GetCellValue(cell, sharedStringTable);
+                    var value = GetCellValue(cell, sharedStringTable);
                     if (!string.IsNullOrEmpty(value))
                     {
                         text.AppendLine(value);
@@ -59,13 +50,6 @@ public class ExcelFileHandler : OfficeFileHandlerBase
         }
 
         var content = text.ToString();
-        var chunks = chunker.CreateChunks(content);
-
-        // Add chunking metadata
-        foreach (var item in chunker.GetChunkingMetadata(chunks.Count))
-        {
-            metadata[item.Key] = item.Value;
-        }
 
         var document = new Document
         {
@@ -73,7 +57,6 @@ public class ExcelFileHandler : OfficeFileHandlerBase
             Source = filePath,
             SourceType = "File",
             Metadata = metadata,
-            Chunks = chunks
         };
 
         return document;

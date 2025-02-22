@@ -1,46 +1,31 @@
+using System.Diagnostics.CodeAnalysis;
 using DeepNotes.Core.Models.Document;
 using DeepNotes.DataLoaders.Utils;
+using Microsoft.SemanticKernel.Text;
 
 namespace DeepNotes.DataLoaders.FileHandlers;
 
 public class TextFileHandler : IFileTypeHandler
 {
-    private readonly TextChunker _chunker;
-    
-    private static readonly string[] SupportedExtensions = { ".txt", ".md", ".json", ".xml", ".csv" };
-    
-    public TextFileHandler(TextChunker? chunker = null)
-    {
-        _chunker = chunker ?? new TextChunker();
-    }
-    
-    public TextChunker GetChunker()
-    {
-        return _chunker;
-    }
+    private static readonly string[] SupportedExtensions = { ".txt", ".md" };
 
     public bool CanHandle(string fileExtension)
     {
         return SupportedExtensions.Contains(fileExtension.ToLower());
     }
 
+    [Experimental("SKEXP0055")]
     public async Task<Document> LoadDocumentAsync(string filePath)
     {
+        var chunks = new List<string>();
         var content = await File.ReadAllTextAsync(filePath);
-        var chunks = Chunker.CreateChunks(content);
 
         var metadata = new Dictionary<string, string>
         {
             ["Encoding"] = "UTF-8", // You could detect this
-            ["LineCount"] = File.ReadAllLines(filePath).Length.ToString(),
+            ["LineCount"] = (await File.ReadAllLinesAsync(filePath)).Length.ToString(),
             ["LastModified"] = new FileInfo(filePath).LastWriteTimeUtc.ToString("O"),
         };
-
-        // Add chunking metadata
-        foreach (var item in Chunker.GetChunkingMetadata(chunks.Count))
-        {
-            metadata[item.Key] = item.Value;
-        }
 
         var document = new Document
         {
@@ -48,11 +33,8 @@ public class TextFileHandler : IFileTypeHandler
             Source = filePath,
             SourceType = "File",
             Metadata = metadata,
-            Chunks = chunks
         };
 
         return document;
     }
-
-    public TextChunker Chunker { get; }
 }
