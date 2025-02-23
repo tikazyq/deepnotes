@@ -17,7 +17,6 @@ public class TextFileHandler : IFileTypeHandler
     [Experimental("SKEXP0055")]
     public async Task<Document> LoadDocumentAsync(string filePath)
     {
-        var chunks = new List<string>();
         var content = await File.ReadAllTextAsync(filePath);
 
         var metadata = new Dictionary<string, string>

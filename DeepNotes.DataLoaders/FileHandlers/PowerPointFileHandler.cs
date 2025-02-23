@@ -17,43 +17,41 @@ public class PowerPointFileHandler : OfficeFileHandlerBase
 
     public override async Task<Document> LoadDocumentAsync(string filePath)
     {
-        using var doc = PresentationDocument.Open(filePath, false);
-        var presentationPart = doc.PresentationPart;
         var text = new StringBuilder();
-        var metadata = ExtractBaseMetadata(doc);
+        var metadata = new Dictionary<string, string>();
 
-        if (presentationPart?.Presentation.SlideIdList != null)
+        await Task.Run(() =>
         {
-            int slideNumber = 1;
-            var slideCount = 0;
-            foreach (var slideId in presentationPart.Presentation.SlideIdList.ChildElements.OfType<SlideId>())
+            using var doc = PresentationDocument.Open(filePath, false);
+            metadata = ExtractBaseMetadata(doc);
+
+            var presentationPart = doc.PresentationPart;
+
+            if (presentationPart == null)
             {
-                var slidePart = (SlidePart)presentationPart.GetPartById(slideId.RelationshipId!);
-                text.AppendLine($"Slide {slideNumber}");
-                text.AppendLine("-------------------");
-
-                var paragraphs = slidePart.Slide.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>();
-                foreach (var paragraph in paragraphs)
-                {
-                    text.AppendLine(paragraph.InnerText);
-                }
-
-                text.AppendLine();
-                slideNumber++;
-                slideCount++;
+                throw new InvalidOperationException("Invalid PowerPoint file");
             }
 
-            metadata["SlideCount"] = slideCount.ToString();
-        }
+            int slideNumber = 1;
+            foreach (var slidePart in presentationPart.SlideParts)
+            {
+                text.AppendLine($"Slide {slideNumber++}");
+                text.AppendLine("-------------------");
 
-        var document = new Document
+                // Extract text from all shapes in the slide
+                text.AppendLine(slidePart.Slide.InnerText);
+                text.AppendLine();
+            }
+
+            metadata["SlideCount"] = (slideNumber - 1).ToString();
+        });
+
+        return new Document
         {
-            Content = text.ToString(),
+            Content = text.ToString().Trim(),
             Source = filePath,
             SourceType = "File",
             Metadata = metadata
         };
-
-        return await Task.FromResult(document);
     }
 }

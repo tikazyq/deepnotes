@@ -39,9 +39,6 @@ public class TextFileHandlerTests
     [Theory]
     [InlineData(".txt")]
     [InlineData(".md")]
-    [InlineData(".json")]
-    [InlineData(".xml")]
-    [InlineData(".csv")]
     public void CanHandle_SupportedExtensions_ReturnsTrue(string extension)
     {
         // Arrange

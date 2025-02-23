@@ -1,12 +1,10 @@
 using System.Text;
-
-namespace DeepNotes.DataLoaders.FileHandlers;
-
 using DeepNotes.Core.Models.Document;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
-using DeepNotes.DataLoaders.Utils;
+
+namespace DeepNotes.DataLoaders.FileHandlers;
 
 public class PdfFileHandler : IFileTypeHandler
 {

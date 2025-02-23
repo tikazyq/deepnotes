@@ -8,7 +8,7 @@ namespace DeepNotes.DataLoaders.FileHandlers;
 
 public class ExcelFileHandler : OfficeFileHandlerBase
 {
-    protected override string[] SupportedExtensions => new[] { ".xlsx" };
+    protected override string[] SupportedExtensions => new[] { ".xlsx", ".xls" };
 
     protected override OpenXmlPackage OpenDocument(string filePath)
     {
